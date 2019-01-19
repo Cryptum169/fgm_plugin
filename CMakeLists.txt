@@ -8,6 +8,7 @@ project(fgm_plugin)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  base_local_planner
   pluginlib
   roscpp
 )
@@ -115,15 +116,18 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
 )
-
+add_library(fgm_plugin src/fgm_planner.cpp)  
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/fgm_plugin.cpp
 # )
-
+# add_executable(fgm_exec src/fgm_planner.cpp)
+# add_dependencies(dwa_local_planner ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(fgm_plugin ${catkin_LIBRARIES})
+# target_link_libraries(plugin_quiz ${catkin_LIBRARIES} dwa_local_planner)
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
@@ -162,7 +166,7 @@ include_directories(
 #   scripts/my_python_script
 #   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 # )
-
+# add_executable(fgm_planner src/fgm_planner.cpp)
 ## Mark executables and/or libraries for installation
 # install(TARGETS ${PROJECT_NAME} ${PROJECT_NAME}_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

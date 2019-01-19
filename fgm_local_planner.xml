@@ -1,0 +1,5 @@
+<library path="lib/libfgm_plugin">
+  <class name="fgm_plugin/FGMPlanner" type="fgm_plugin::FGMPlanner" base_class_type="nav_core::BaseLocalPlanner">
+    <description>This is a Follow the Gap plugin.</description>
+  </class>
+</library>
