@@ -5,6 +5,7 @@
 #include <string>
 #include <math.h>
 #include <sstream>
+#include "std_msgs/String.h"
 #include <stdlib.h>
 #include <fgm_plugin/gap.h>
 #include <fgm_plugin/fgm_planner.h>
@@ -15,24 +16,31 @@ PLUGINLIB_EXPORT_CLASS(fgm_plugin::FGMPlanner, nav_core::BaseLocalPlanner)
 namespace fgm_plugin
 {
     FGMPlanner::FGMPlanner() {
-        ROS_INFO_STREAM("FGMPlanner planner object created");
         ros::NodeHandle nh;
-        // ros::Publisher info_pub;
+        ros::Publisher info_pub;
     }
 
     void FGMPlanner::laserScanCallback(const sensor_msgs::LaserScan msg) {
         // Copy the value of laser scan message into a local variable
+        // ROS_INFO_STREAM(msg);
+        std_msgs::String scanCallback;
+        scanCallback.data = "Laser callback called";
+        info_pub.publish(scanCallback);
+        // ROS_INFO_STREAM(msg.angle_max);
         stored_scan_msgs = msg;
     }
 
     void FGMPlanner::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros) {
         // ros::init(argc, argv, "planner_node"); // Node?
-        // info_pub = nh.advertise<std::string>("planner_info", 100);
-        ROS_INFO_STREAM("FGMPlanner initializde");
         
+        info_pub = nh.advertise<std_msgs::String>("planner_info", 100);
         // Set up laser scan call back
+        // Doesnt really do anything now because no ros spin.
         ros::Subscriber sub = nh.subscribe("/scan", 1000, &FGMPlanner::laserScanCallback, this);
-        ros::spin();
+        ROS_INFO_STREAM("FGMPlanner initialized");
+
+        // ros::spin(); // This was stupid.
+        ROS_INFO_STREAM("ever reached?");
     }
 
     bool FGMPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan) {
@@ -44,6 +52,17 @@ namespace fgm_plugin
     }
 
     bool FGMPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel) {
+        boost::shared_ptr<sensor_msgs::LaserScan const> sharedPtr;
+        // sensor_msgs::LaserScan stored;
+        sharedPtr  = ros::topic::waitForMessage<sensor_msgs::LaserScan>("/scan", ros::Duration(1));
+        if (sharedPtr == NULL) {
+            ROS_WARN("No LaserScan messages received");
+        }
+        else {
+            stored_scan_msgs = *sharedPtr;
+        }
+            
+        // stored_scan_msgs = ros::topic::waitForMessage("/scan");
         std::priority_queue <Gap, std::vector<Gap>, gapComparator> pq;
         
         Gap currLarge(0,0,0);
@@ -54,6 +73,15 @@ namespace fgm_plugin
         bool prev = true; // Take range of pov as wall
         int size = 0;
         int start_nan_idx = 0;
+
+        std_msgs::String str_msg;
+        str_msg.data = "vel called";
+        info_pub.publish(str_msg);
+
+        std::stringstream ss;
+        // ROS_INFO_STREAM(stored_scan_msgs.angle_max);
+        ss << stored_scan_msgs.angle_max;
+
         for(std::vector<float>::size_type it = 0; it < stored_scan_msgs.ranges.size(); ++it)
         {
             if (prev) {
@@ -63,6 +91,7 @@ namespace fgm_plugin
                     if (size > 20) {
                         // Be reworked to populate the obstacle size
                         pq.push(Gap(start_nan_idx, size, 0));
+                        info_pub.publish(str_msg);
                     }
                     start_nan_idx = -1;
                     size = 0;
@@ -75,23 +104,26 @@ namespace fgm_plugin
                     prev = true;
                 }
             }
-
             // Populate obstacle?
         }
 
         if (prev) {
             pq.push(Gap(start_nan_idx, size, 0));
         }
+        
 
         if (pq.size() != 0) {
             currLarge = pq.top();
             gap_angle = (currLarge.getStartAngle() + currLarge.getSize() / 2) * stored_scan_msgs.angle_increment + stored_scan_msgs.angle_min;
-            ROS_INFO_STREAM("Gap count:" << pq.size() << " , Bearing: " << gap_angle);
+
+            ss << "Gap count:" << pq.size() << " , Bearing: " << gap_angle;
+            // str_msg.data = ss.str();
+            // info_pub.publish(str_msg);
             // std::string info_string = "Gap count:" + std::to_string(pq.size()) + "\n");// << " , Bearing: " << std::to_string(gap_angle) << std::endl;
             // info_pub.publish(info_string);
         }
-
-
+        str_msg.data = ss.str();
+        info_pub.publish(str_msg);
         
         return true;
     }

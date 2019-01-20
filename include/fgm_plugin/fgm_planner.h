@@ -1,13 +1,15 @@
 #ifndef FGM_LOCAL_PLANNER_DWA_PLANNER_H_
 #define FGM_LOCAL_PLANNER_DWA_PLANNER_H_
 
-
+#include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <costmap_2d/costmap_2d_ros.h>
 #include <tf/transform_listener.h>
 #include <nav_core/base_local_planner.h>
 #include <sensor_msgs/LaserScan.h>
+#include <boost/shared_ptr.hpp>
+
 
 namespace fgm_plugin {
   /**
@@ -62,9 +64,10 @@ namespace fgm_plugin {
     private:
         std::string planner_name;
         sensor_msgs::LaserScan stored_scan_msgs;
+        // boost::shared_ptr<sensor_msgs::LaserScan const> sharedPtr;
         float gap_angle;
         ros::NodeHandle nh;
-        // ros::Publisher info_pub;
+        ros::Publisher info_pub;
         
   };
 };
