@@ -23,6 +23,8 @@
   <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
     <param name="publish_frequency" type="double" value="30.0" />
   </node>
+
+  <!-- <include file="$(find fgm_plugin)/launch/publish_ground_truth.launch"/>    -->
   
   <!-- Fake laser -->
   <node pkg="nodelet" type="nodelet" name="laserscan_nodelet_manager" args="manager"/>
@@ -34,4 +36,5 @@
     <remap from="image" to="/camera/depth/image_raw"/>
     <remap from="scan" to="/scan"/>
   </node>
+  <node pkg="fgm_plugin" type="ground_truth_odom" name="ground_truth_odom"/>
 </launch>

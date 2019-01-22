@@ -1,15 +1,19 @@
 #include <ros/ros.h>
+#include <tf/transform_datatypes.h>
 #include <pluginlib/class_list_macros.h>
 #include <vector>
 #include <queue>
 #include <string>
 #include <math.h>
+#include <cmath>
 #include <sstream>
 #include "std_msgs/String.h"
 #include <stdlib.h>
 #include <fgm_plugin/gap.h>
 #include <fgm_plugin/fgm_planner.h>
 #include <fgm_plugin/gap_comparator.h>
+
+#define PI 3.1415926
 
 PLUGINLIB_EXPORT_CLASS(fgm_plugin::FGMPlanner, nav_core::BaseLocalPlanner)
 
@@ -19,6 +23,7 @@ namespace fgm_plugin
         ros::NodeHandle nh;
         ros::Publisher info_pub;
     }
+
 
     void FGMPlanner::laserScanCallback(const sensor_msgs::LaserScan msg) {
         // Copy the value of laser scan message into a local variable
@@ -31,57 +36,79 @@ namespace fgm_plugin
     }
 
     void FGMPlanner::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros) {
-        // ros::init(argc, argv, "planner_node"); // Node?
-        
+        alpha = 2.0;
         info_pub = nh.advertise<std_msgs::String>("planner_info", 100);
+        // costmap_ros_ = costmap_ros;
+        // costmap_ros_->getRobotPose(current_pose_);
+        // ROS_INFO_STREAM("current pose is:");
+        // ROS_INFO_STREAM(current_pose_.getOrigin().getX() << ", " << current_pose_.getOrigin().getY());
         // Set up laser scan call back
-        // Doesnt really do anything now because no ros spin.
-        ros::Subscriber sub = nh.subscribe("/scan", 1000, &FGMPlanner::laserScanCallback, this);
+        // Requires ros::spin to work. Ros spin blocks and never exits initialize 
+        // ros::Subscriber sub = nh.subscribe("/scan", 1000, &FGMPlanner::laserScanCallback, this);
         ROS_INFO_STREAM("FGMPlanner initialized");
 
-        // ros::spin(); // This was stupid.
-        ROS_INFO_STREAM("ever reached?");
+        // ros::spin(); // Blocking
     }
 
     bool FGMPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan) {
+        // ROS_INFO_STREAM(plan.back());
+        // plan is the global plan to follow, assumes last entry of plan is the goal
+        goal_pose = plan.back();
         return true;
     }
 
     bool FGMPlanner::isGoalReached() {
-        return false;
+        if (sqrt(pow(goal_pose.pose.position.y - current_pose_.pose.pose.position.y,2) + pow(goal_pose.pose.position.x - current_pose_.pose.pose.position.x,2)) < 0.5) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     bool FGMPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel) {
-        boost::shared_ptr<sensor_msgs::LaserScan const> sharedPtr;
-        // sensor_msgs::LaserScan stored;
-        sharedPtr  = ros::topic::waitForMessage<sensor_msgs::LaserScan>("/scan", ros::Duration(1));
-        if (sharedPtr == NULL) {
+
+        // used perfect localization, odom retrieved from gazebo/model_states
+        sharedPtr_pose = ros::topic::waitForMessage<nav_msgs::Odometry>("/ground_truth/odom", ros::Duration(1));
+        if (sharedPtr_pose == NULL) {
+            ROS_ERROR("Planner received no odom!");
+        } else {
+            current_pose_ = *sharedPtr_pose;
+        }
+
+        // Fix math
+        double roll, pitch, yaw;
+        tf::Quaternion q(current_pose_.pose.pose.orientation.x, current_pose_.pose.pose.orientation.y,current_pose_.pose.pose.orientation.z,current_pose_.pose.pose.orientation.w);
+        // yaw = q.getAngle();
+        // yaw = yaw > 3.16 ? yaw - 2 * 3.1415926 : yaw;
+        yaw = atan2(2.0 * (current_pose_.pose.pose.orientation.w * current_pose_.pose.pose.orientation.z + current_pose_.pose.pose.orientation.x * current_pose_.pose.pose.orientation.y),
+            1.0 - 2.0 * (current_pose_.pose.pose.orientation.y * current_pose_.pose.pose.orientation.y + current_pose_.pose.pose.orientation.z * current_pose_.pose.pose.orientation.z));
+        goal_angle = atan2(goal_pose.pose.position.y - current_pose_.pose.pose.position.y, goal_pose.pose.position.x - current_pose_.pose.pose.position.x);
+        // ROS_INFO_STREAM("Robot bearing" << yaw << ", Goal heading" << goal_angle);
+        yaw = fmod(yaw + 2 * PI, 2 * PI);
+        goal_angle = fmod(goal_angle + 2 * PI, 2 * PI);
+        goal_angle = goal_angle - yaw;
+
+        // Handle sensor input
+        sharedPtr_laser = ros::topic::waitForMessage<sensor_msgs::LaserScan>("/scan", ros::Duration(1));
+        if (sharedPtr_laser == NULL) {
             ROS_WARN("No LaserScan messages received");
         }
         else {
-            stored_scan_msgs = *sharedPtr;
+            stored_scan_msgs = *sharedPtr_laser;
         }
-            
-        // stored_scan_msgs = ros::topic::waitForMessage("/scan");
+
+
         std::priority_queue <Gap, std::vector<Gap>, gapComparator> pq;
         
         Gap currLarge(0,0,0);
         gap_angle = 0;
-        cmd_vel.linear.x = 0.0;
 
         // Compute gaps
         bool prev = true; // Take range of pov as wall
         int size = 0;
         int start_nan_idx = 0;
 
-        std_msgs::String str_msg;
-        str_msg.data = "vel called";
-        info_pub.publish(str_msg);
-
-        std::stringstream ss;
-        // ROS_INFO_STREAM(stored_scan_msgs.angle_max);
-        ss << stored_scan_msgs.angle_max;
-
+        // Generating Gaps
         for(std::vector<float>::size_type it = 0; it < stored_scan_msgs.ranges.size(); ++it)
         {
             if (prev) {
@@ -91,7 +118,7 @@ namespace fgm_plugin
                     if (size > 20) {
                         // Be reworked to populate the obstacle size
                         pq.push(Gap(start_nan_idx, size, 0));
-                        info_pub.publish(str_msg);
+                        // info_pub.publish(str_msg);
                     }
                     start_nan_idx = -1;
                     size = 0;
@@ -104,31 +131,39 @@ namespace fgm_plugin
                     prev = true;
                 }
             }
-            // Populate obstacle?
+            // Populate obstacle here
         }
-
         if (prev) {
             pq.push(Gap(start_nan_idx, size, 0));
         }
         
-
+        // Calculate gap angle
         if (pq.size() != 0) {
             currLarge = pq.top();
             gap_angle = (currLarge.getStartAngle() + currLarge.getSize() / 2) * stored_scan_msgs.angle_increment + stored_scan_msgs.angle_min;
+            // ss << "Gap count:" << pq.size() << " , Bearing: " << gap_angle;
 
-            ss << "Gap count:" << pq.size() << " , Bearing: " << gap_angle;
-            // str_msg.data = ss.str();
-            // info_pub.publish(str_msg);
-            // std::string info_string = "Gap count:" + std::to_string(pq.size()) + "\n");// << " , Bearing: " << std::to_string(gap_angle) << std::endl;
-            // info_pub.publish(info_string);
         }
-        str_msg.data = ss.str();
-        info_pub.publish(str_msg);
+        ROS_INFO_STREAM("Gap relative angle: " << gap_angle << ", range_min: " << stored_scan_msgs.range_min);
+        // cmd_vel.angular.z = gap_angle * 0.5;
+        dmin = stored_scan_msgs.range_min;
+        // dmin = 10;
+        heading = (alpha / dmin * gap_angle + goal_angle)/(alpha/dmin + 1);
+        // heading = goal_angle;
+        ROS_INFO_STREAM("Angular speed: " << heading);
+        // cmd_vel.angular.z = heading;
+        cmd_vel.angular.z = goal_angle;
+        cmd_vel.linear.x = fmin(fabs(0.1/cmd_vel.angular.z),0.4);
         
+        // cmd_vel.linear.x = 0.1;
+        // cmd_vel.
+        // ROS_INFO_STREAM
         return true;
+
     }
 
     FGMPlanner::~FGMPlanner() {
         ROS_INFO_STREAM("Terminated");
     }
+
 }

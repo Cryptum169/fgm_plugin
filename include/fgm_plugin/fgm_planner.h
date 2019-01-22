@@ -9,6 +9,7 @@
 #include <nav_core/base_local_planner.h>
 #include <sensor_msgs/LaserScan.h>
 #include <boost/shared_ptr.hpp>
+#include <nav_msgs/Odometry.h>
 
 
 namespace fgm_plugin {
@@ -62,13 +63,21 @@ namespace fgm_plugin {
         void laserScanCallback(const sensor_msgs::LaserScan msg);
 
     private:
+        // base_local_planner::LocalPlannerUtil planner_util_;
         std::string planner_name;
         sensor_msgs::LaserScan stored_scan_msgs;
-        // boost::shared_ptr<sensor_msgs::LaserScan const> sharedPtr;
         float gap_angle;
+        float goal_angle;
+        float heading;
+        float dmin;
+        float alpha;
         ros::NodeHandle nh;
         ros::Publisher info_pub;
-        
+        geometry_msgs::PoseStamped goal_pose;
+        nav_msgs::Odometry current_pose_;
+        costmap_2d::Costmap2DROS* costmap_ros_;
+        boost::shared_ptr<sensor_msgs::LaserScan const> sharedPtr_laser;
+        boost::shared_ptr<nav_msgs::Odometry const> sharedPtr_pose;
   };
 };
 #endif
