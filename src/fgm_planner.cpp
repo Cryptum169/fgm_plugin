@@ -31,22 +31,13 @@ namespace fgm_plugin
         std_msgs::String scanCallback;
         scanCallback.data = "Laser callback called";
         info_pub.publish(scanCallback);
-        // ROS_INFO_STREAM(msg.angle_max);
         stored_scan_msgs = msg;
     }
 
     void FGMPlanner::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros) {
-        alpha = 2.0;
+        alpha = 1.0;
         info_pub = nh.advertise<std_msgs::String>("planner_info", 100);
-        // costmap_ros_ = costmap_ros;
-        // costmap_ros_->getRobotPose(current_pose_);
-        // ROS_INFO_STREAM("current pose is:");
-        // ROS_INFO_STREAM(current_pose_.getOrigin().getX() << ", " << current_pose_.getOrigin().getY());
-        // Set up laser scan call back
-        // Requires ros::spin to work. Ros spin blocks and never exits initialize 
-        // ros::Subscriber sub = nh.subscribe("/scan", 1000, &FGMPlanner::laserScanCallback, this);
         ROS_INFO_STREAM("FGMPlanner initialized");
-
         // ros::spin(); // Blocking
     }
 
@@ -76,14 +67,9 @@ namespace fgm_plugin
         }
 
         // Fix math
-        double roll, pitch, yaw;
-        tf::Quaternion q(current_pose_.pose.pose.orientation.x, current_pose_.pose.pose.orientation.y,current_pose_.pose.pose.orientation.z,current_pose_.pose.pose.orientation.w);
-        // yaw = q.getAngle();
-        // yaw = yaw > 3.16 ? yaw - 2 * 3.1415926 : yaw;
-        yaw = atan2(2.0 * (current_pose_.pose.pose.orientation.w * current_pose_.pose.pose.orientation.z + current_pose_.pose.pose.orientation.x * current_pose_.pose.pose.orientation.y),
+        double yaw = atan2(2.0 * (current_pose_.pose.pose.orientation.w * current_pose_.pose.pose.orientation.z + current_pose_.pose.pose.orientation.x * current_pose_.pose.pose.orientation.y),
             1.0 - 2.0 * (current_pose_.pose.pose.orientation.y * current_pose_.pose.pose.orientation.y + current_pose_.pose.pose.orientation.z * current_pose_.pose.pose.orientation.z));
         goal_angle = atan2(goal_pose.pose.position.y - current_pose_.pose.pose.position.y, goal_pose.pose.position.x - current_pose_.pose.pose.position.x);
-        // ROS_INFO_STREAM("Robot bearing" << yaw << ", Goal heading" << goal_angle);
         yaw = fmod(yaw + 2 * PI, 2 * PI);
         goal_angle = fmod(goal_angle + 2 * PI, 2 * PI);
         goal_angle = goal_angle - yaw;
@@ -112,20 +98,19 @@ namespace fgm_plugin
         for(std::vector<float>::size_type it = 0; it < stored_scan_msgs.ranges.size(); ++it)
         {
             if (prev) {
-                if (stored_scan_msgs.ranges[it] != stored_scan_msgs.ranges[it]) {
+                if (stored_scan_msgs.ranges[it] != stored_scan_msgs.ranges[it] || stored_scan_msgs.ranges[it] > 5.0) {
                     ++size;
                 } else {
                     if (size > 20) {
                         // Be reworked to populate the obstacle size
                         pq.push(Gap(start_nan_idx, size, 0));
-                        // info_pub.publish(str_msg);
                     }
                     start_nan_idx = -1;
                     size = 0;
                     prev = false;
                 }
             } else {
-                if (stored_scan_msgs.ranges[it] != stored_scan_msgs.ranges[it]) {
+                if (stored_scan_msgs.ranges[it] != stored_scan_msgs.ranges[it] || stored_scan_msgs.ranges[it] > 5.0) {
                     start_nan_idx = it;
                     size = 1;
                     prev = true;
@@ -141,23 +126,14 @@ namespace fgm_plugin
         if (pq.size() != 0) {
             currLarge = pq.top();
             gap_angle = (currLarge.getStartAngle() + currLarge.getSize() / 2) * stored_scan_msgs.angle_increment + stored_scan_msgs.angle_min;
-            // ss << "Gap count:" << pq.size() << " , Bearing: " << gap_angle;
-
         }
+
         ROS_INFO_STREAM("Gap relative angle: " << gap_angle << ", range_min: " << stored_scan_msgs.range_min);
-        // cmd_vel.angular.z = gap_angle * 0.5;
         dmin = stored_scan_msgs.range_min;
-        // dmin = 10;
-        heading = (alpha / dmin * gap_angle + goal_angle)/(alpha/dmin + 1);
-        // heading = goal_angle;
+        heading = (alpha / dmin * gap_angle + 2 * dmin / alpha * goal_angle)/(alpha/dmin + 1);
         ROS_INFO_STREAM("Angular speed: " << heading);
-        // cmd_vel.angular.z = heading;
-        cmd_vel.angular.z = goal_angle;
+        cmd_vel.angular.z = heading;
         cmd_vel.linear.x = fmin(fabs(0.1/cmd_vel.angular.z),0.4);
-        
-        // cmd_vel.linear.x = 0.1;
-        // cmd_vel.
-        // ROS_INFO_STREAM
         return true;
 
     }
