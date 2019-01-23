@@ -15,4 +15,16 @@
   <stack_hexagons parent="base_link"/>
   <sensor_kinect  parent="base_link"/>
 
+  <plugin name="p3d_base_controller" filename="libgazebo_ros_p3d.so">
+    <alwaysOn>true</alwaysOn>
+    <updateRate>200.0</updateRate>
+    <bodyName>base_link</bodyName>
+    <topicName>ground_truth/state_raw</topicName>
+    <gaussianNoise>0.00</gaussianNoise>
+    <frameName>world</frameName>
+    <!-- origin is at spawn location -->
+    <xyzOffset>0 0 0</xyzOffset>
+    <rpyOffset>0 0 0</rpyOffset>
+  </plugin>
+
 </robot>
