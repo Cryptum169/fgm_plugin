@@ -80,9 +80,11 @@ namespace fgm_plugin
         yaw = fmod(yaw + 2 * PI, 2 * PI);
         goal_angle = fmod(goal_angle + 2 * PI, 2 * PI);
         goal_angle = goal_angle - yaw;
+        goal_angle = fmod(goal_angle + 2 * PI, 2 * PI);
+        goal_angle = (goal_angle > PI) ? goal_angle - 2 * PI : goal_angle; 
 
         // Handle sensor input
-        sharedPtr_laser = ros::topic::waitForMessage<sensor_msgs::LaserScan>("/scan", ros::Duration(1));
+        sharedPtr_laser = ros::topic::waitForMessage<sensor_msgs::LaserScan>("/laserscan", ros::Duration(1));
         if (sharedPtr_laser == NULL) {
             ROS_WARN("No LaserScan messages received");
         }
@@ -98,14 +100,13 @@ namespace fgm_plugin
         // Compute gaps
         bool prev = true; // Take range of pov as wall
         int size = 0;
-        int start_nan_idx = 0;
+        int start_nan_idx = 70;
         dmin = 10;
 
-        // Generating Gaps
-        for(std::vector<float>::size_type it = 0; it < stored_scan_msgs.ranges.size(); ++it)
+        for(std::vector<float>::size_type it = 70; it < 200; ++it)
         {
             if (prev) {
-                if (stored_scan_msgs.ranges[it] != stored_scan_msgs.ranges[it] || stored_scan_msgs.ranges[it] > 9.0) {
+                if (stored_scan_msgs.ranges[it] != stored_scan_msgs.ranges[it] || stored_scan_msgs.ranges[it] > 2.0) {
                     ++size;
                 } else {
                     dmin = fmin(dmin, stored_scan_msgs.ranges[it]);
@@ -118,7 +119,7 @@ namespace fgm_plugin
                     prev = false;
                 }
             } else {
-                if (stored_scan_msgs.ranges[it] != stored_scan_msgs.ranges[it] || stored_scan_msgs.ranges[it] > 9.0) {
+                if (stored_scan_msgs.ranges[it] != stored_scan_msgs.ranges[it] || stored_scan_msgs.ranges[it] > 2.0) {
                     start_nan_idx = it;
                     size = 1;
                     prev = true;
@@ -137,11 +138,9 @@ namespace fgm_plugin
             currLarge = pq.top();
             gap_angle = (currLarge.getStartAngle() + currLarge.getSize() / 2) * stored_scan_msgs.angle_increment + stored_scan_msgs.angle_min;
         }
-        // ROS_INFO_STREAM("dmin: " << dmin);
+        // ROS_INFO_STREAM("Gap_angle: " << gap_angle << ", Goal: " << goal_angle);
         heading = (alpha / dmin * gap_angle + dmin * goal_angle)/(alpha / dmin + 1);
-        // ROS_INFO_STREAM("Angular speed: " << heading);
-        cmd_vel.angular.z = 0.5 * heading;
-        cmd_vel.linear.x = fmin(fabs(0.02 / cmd_vel.angular.z),0.4);
+        cmd_vel.linear.x = fmin(fabs(0.05 / heading),0.6);
         heading = fmax(fmin(heading, 0.8), -0.8);
         cmd_vel.angular.z = 0.5 * heading;
         return true;
