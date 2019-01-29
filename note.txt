@@ -1,0 +1,2 @@
+Hokuyo Lidar mode modified according to https://bharat-robotics.github.io/blog/adding-hokuyo-laser-to-turtlebot-in-gazebo-for-simulation/
+Modification were made in turtlebot_gazebo, inside system, is a hacky implementation
