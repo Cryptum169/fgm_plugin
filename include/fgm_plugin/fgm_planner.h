@@ -73,12 +73,13 @@ namespace fgm_plugin {
         float alpha;
         ros::NodeHandle nh;
         ros::Publisher info_pub;
+        ros::Subscriber laser_sub;
         geometry_msgs::PoseStamped goal_pose;
         geometry_msgs::Pose current_pose_;
         costmap_2d::Costmap2DROS* costmap_ros_;
         boost::shared_ptr<sensor_msgs::LaserScan const> sharedPtr_laser;
-        boost::shared_ptr<geometry_msgs::Pose const> sharedPtr_pose;
-
+        // boost::shared_ptr<geometry_msgs::Pose const> sharedPtr_pose;
+        boost::shared_ptr<nav_msgs::Odometry const> sharedPtr_pose;
         // costmap_2d::Costmap2DROS* costmap_ros_;
         // tf::Stamped<tf::Pose> current_pose_;
   };

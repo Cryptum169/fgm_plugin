@@ -22,21 +22,19 @@ namespace fgm_plugin
     FGMPlanner::FGMPlanner() {
         ros::NodeHandle nh;
         ros::Publisher info_pub;
+        ros::Subscriber laser_sub;
     }
 
 
     void FGMPlanner::laserScanCallback(const sensor_msgs::LaserScan msg) {
         // Copy the value of laser scan message into a local variable
-        // ROS_INFO_STREAM(msg);
-        std_msgs::String scanCallback;
-        scanCallback.data = "Laser callback called";
-        info_pub.publish(scanCallback);
         stored_scan_msgs = msg;
     }
 
     void FGMPlanner::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros) {
         alpha = 2.0;
         info_pub = nh.advertise<std_msgs::String>("planner_info", 100);
+        laser_sub = nh.subscribe("/scan", 100, &FGMPlanner::laserScanCallback, this);
         costmap_ros_ = costmap_ros;
         // costmap_ros_->getRobotPose(current_pose_);
         // ROS_INFO_STREAM("Robot initial pose:" << current_pose_.getOrigin().getX() << ", " << current_pose_.getOrigin().getY() << ", " << tf::getYaw(current_pose_.getRotation()));
@@ -62,12 +60,12 @@ namespace fgm_plugin
     bool FGMPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel) {
 
         // used perfect localization, odom retrieved from gazebo/model_states
-        // sharedPtr_pose = ros::topic::waitForMessage<nav_msgs::Odometry>("/odom", ros::Duration(1));
-        sharedPtr_pose = ros::topic::waitForMessage<geometry_msgs::Pose>("/robot_pose", ros::Duration(1));
+        sharedPtr_pose = ros::topic::waitForMessage<nav_msgs::Odometry>("/odom", ros::Duration(1));
+        // sharedPtr_pose = ros::topic::waitForMessage<geometry_msgs::Pose>("/robot_pose", ros::Duration(1));
         if (sharedPtr_pose == NULL) {
             ROS_ERROR("Planner received no odom!");
         } else {
-            current_pose_ = *sharedPtr_pose;
+            current_pose_ = (*sharedPtr_pose).pose.pose;
         }
         
         // ROS_INFO_STREAM("comvel called");
