@@ -103,10 +103,11 @@ namespace fgm_plugin
         int start_nan_idx = 0;
         dmin = 10;
 
-        for(std::vector<float>::size_type it = 70; it < 200; ++it)
+        // Generating Gaps
+        for(std::vector<float>::size_type it = 0; it < stored_scan_msgs.ranges.size(); ++it)
         {
             if (prev) {
-                if (stored_scan_msgs.ranges[it] != stored_scan_msgs.ranges[it] || stored_scan_msgs.ranges[it] > 9.0) {
+                if (stored_scan_msgs.ranges[it] != stored_scan_msgs.ranges[it] || stored_scan_msgs.ranges[it] > 9.0) { // isnan
                     ++size;
                 } else {
                     r_dist = stored_scan_msgs.ranges[it];
@@ -148,6 +149,7 @@ namespace fgm_plugin
         heading = fmax(fmin(heading, 0.8), -0.8);
         cmd_vel.angular.z = 0.8 * heading;
         return true;
+
     }
 
     FGMPlanner::~FGMPlanner() {
