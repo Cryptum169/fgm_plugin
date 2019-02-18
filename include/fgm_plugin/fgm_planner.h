@@ -1,5 +1,5 @@
-#ifndef FGM_LOCAL_PLANNER_DWA_PLANNER_H_
-#define FGM_LOCAL_PLANNER_DWA_PLANNER_H_
+#ifndef FGM_LOCAL_PLANNER
+#define FGM_LOCAL_PLANNER
 
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -10,7 +10,10 @@
 #include <sensor_msgs/LaserScan.h>
 #include <boost/shared_ptr.hpp>
 #include <nav_msgs/Odometry.h>
-
+// #include <local_planner_util.h>
+#include <base_local_planner/local_planner_util.h>
+#include <costmap_2d/costmap_2d_ros.h>
+#include <costmap_2d/costmap_2d.h>
 
 namespace fgm_plugin {
   /**
@@ -73,14 +76,17 @@ namespace fgm_plugin {
         float alpha;
         ros::NodeHandle nh;
         ros::Publisher info_pub;
+        ros::Subscriber laser_sub;
         geometry_msgs::PoseStamped goal_pose;
         geometry_msgs::Pose current_pose_;
         costmap_2d::Costmap2DROS* costmap_ros_;
         boost::shared_ptr<sensor_msgs::LaserScan const> sharedPtr_laser;
         boost::shared_ptr<geometry_msgs::Pose const> sharedPtr_pose;
-
+        base_local_planner::LocalPlannerUtil planner_util_;
+        tf::Stamped<tf::Pose> current_drive_cmds;
+        // boost::shared_ptr<nav_msgs::Odometry const> sharedPtr_pose;
         // costmap_2d::Costmap2DROS* costmap_ros_;
-        // tf::Stamped<tf::Pose> current_pose_;
+        tf::Stamped<tf::Pose> current_pose_2;
   };
 };
 #endif
