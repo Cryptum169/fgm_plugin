@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   geometry_msgs
   gazebo_msgs
+  gazebo_fake_localization
 )
 
 ## System dependencies are found with CMake's conventions

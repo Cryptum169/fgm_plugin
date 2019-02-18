@@ -1,5 +1,5 @@
-#ifndef FGM_LOCAL_PLANNER_DWA_PLANNER_H_
-#define FGM_LOCAL_PLANNER_DWA_PLANNER_H_
+#ifndef FGM_LOCAL_PLANNER
+#define FGM_LOCAL_PLANNER
 
 #include <ros/ros.h>
 #include <geometry_msgs/PoseStamped.h>
