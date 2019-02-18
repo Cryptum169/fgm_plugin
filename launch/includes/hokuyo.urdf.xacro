@@ -13,7 +13,7 @@
       <visual>
         <origin xyz="0 0 0" rpy="0 0 0"/>
         <geometry>
-          <mesh filename="package://turtlebot_description/meshes/sensors/hokuyo.dae"/>
+          <mesh filename="$(find fgm_plugin)/launch/includes/hokuyo.dae"/>
         </geometry>
       </visual>
       <inertial>
