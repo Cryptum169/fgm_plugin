@@ -2,8 +2,6 @@ Follow the Gap on hokuyo implementation. Installation of Hokuyo on Kinetic is in
 
 Installation process:
 sudo apt-get install ros-kinetic-urg-node
-Replace turtlebot_description/urdf/turtlebot_gazebo.urdf.xacro with the same file name under fgm_plugin/launch/includes/turtlebot_gazebo.urdf.xacro
-May require sudo permission
 
 Running with Hokuyo:
 export TURTLEBOT_3D_SENSOR=hokuyo

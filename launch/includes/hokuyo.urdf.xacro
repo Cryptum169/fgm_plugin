@@ -1,5 +1,5 @@
 <robot name="sensor_hokuyo" xmlns:xacro="http://ros.org/wiki/xacro">
-  <xacro:include filename="$(find turtlebot_description)/urdf/turtlebot_gazebo.urdf.xacro"/>
+  <xacro:include filename="$(find fgm_plugin)/launch/includes/turtlebot_gazebo.urdf.xacro"/>
   <xacro:include filename="$(find turtlebot_description)/urdf/turtlebot_properties.urdf.xacro"/>
 
   <xacro:macro name="sensor_hokuyo" params="parent">
