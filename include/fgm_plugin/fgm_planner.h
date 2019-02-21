@@ -64,6 +64,7 @@ namespace fgm_plugin {
         void initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros);
 
         void laserScanCallback(const sensor_msgs::LaserScan msg);
+        void poseCallback(const geometry_msgs::Pose msg);
 
     private:
         // base_local_planner::LocalPlannerUtil planner_util_;
@@ -77,6 +78,8 @@ namespace fgm_plugin {
         ros::NodeHandle nh;
         ros::Publisher info_pub;
         ros::Subscriber laser_sub;
+        ros::Subscriber pose_sub;
+
         geometry_msgs::PoseStamped goal_pose;
         geometry_msgs::Pose current_pose_;
         costmap_2d::Costmap2DROS* costmap_ros_;
