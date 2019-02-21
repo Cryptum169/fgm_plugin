@@ -23,30 +23,30 @@ namespace fgm_plugin
         ros::NodeHandle nh;
         ros::Publisher info_pub;
         ros::Subscriber laser_sub;
-    }
+        ros::Subscriber pose_sub;
 
+    }
 
     void FGMPlanner::laserScanCallback(const sensor_msgs::LaserScan msg) {
         // Store local san message
         stored_scan_msgs = msg;
     }
 
+    void FGMPlanner::poseCallback(const geometry_msgs::Pose msg) {
+        // Robot Pose message
+        current_pose_ = msg;
+    }
+
     void FGMPlanner::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros) {
         alpha = 2.0;
         info_pub = nh.advertise<std_msgs::String>("planner_info", 100);
         laser_sub = nh.subscribe("/scan", 100, &FGMPlanner::laserScanCallback, this);
+        pose_sub = nh.subscribe("/robot_pose",10, &FGMPlanner::poseCallback, this);
 
-        costmap_ros_ = costmap_ros;
-        costmap_ros_->getRobotPose(current_pose_2);
-        char buffer [50];
-        int n=sprintf(buffer, "Robot Start Position: %f, %f, %f\n",current_pose_2.getOrigin().getX(), current_pose_2.getOrigin().getY(), tf::getYaw(current_pose_2.getRotation()));
-        ROS_INFO_STREAM(buffer);
-
-        costmap_2d::Costmap2D* costmap = costmap_ros_->getCostmap();
-        planner_util_.initialize(tf, costmap, costmap_ros_->getGlobalFrameID());
+        // costmap_2d::Costmap2D* costmap = costmap_ros_->getCostmap();
+        // planner_util_.initialize(tf, costmap, costmap_ros_->getGlobalFrameID());
         ROS_INFO_STREAM("FGMPlanner initialized");
-        // ros::spin(); // Only spin at the right level!
-        // Spin at the right place
+
     }
 
     bool FGMPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan) {
@@ -66,12 +66,12 @@ namespace fgm_plugin
 
     bool FGMPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel) {
         // used perfect localization
-        sharedPtr_pose = ros::topic::waitForMessage<geometry_msgs::Pose>("/robot_pose", ros::Duration(1));
-        if (sharedPtr_pose == NULL) {
-            ROS_ERROR("Planner received no odom!");
-        } else {
-            current_pose_ = (*sharedPtr_pose);
-        }
+        // sharedPtr_pose = ros::topic::waitForMessage<geometry_msgs::Pose>("/robot_pose", ros::Duration(1));
+        // if (sharedPtr_pose == NULL) {
+        //     ROS_ERROR("Planner received no odom!");
+        // } else {
+        //     current_pose_ = (*sharedPtr_pose);
+        // }
 
         double yaw = atan2(2.0 * (current_pose_.orientation.w * current_pose_.orientation.z + current_pose_.orientation.x * current_pose_.orientation.y),
             1.0 - 2.0 * (current_pose_.orientation.y * current_pose_.orientation.y + current_pose_.orientation.z * current_pose_.orientation.z));
@@ -82,11 +82,6 @@ namespace fgm_plugin
         // double pose_y = current_pose_2.getOrigin().getY();
         // double yaw = tf::getYaw(current_pose_2.getRotation());
         // goal_angle = atan2(goal_pose.pose.position.y - pose_y, goal_pose.pose.position.x - pose_y);
-
-        // char buffer[70];
-        // int n=sprintf(buffer, "Robot Start Position: %f, %f, %f\n",current_pose_2.getOrigin().getX(), current_pose_2.getOrigin().getY(), tf::getYaw(current_pose_2.getRotation()));
-        // ROS_INFO_STREAM(buffer);
-
         yaw = fmod(yaw + 2 * PI, 2 * PI);
         goal_angle = fmod(goal_angle + 2 * PI, 2 * PI);
         goal_angle = goal_angle - yaw;
@@ -145,7 +140,7 @@ namespace fgm_plugin
         }
 
         heading = (alpha / dmin * gap_angle + dmin * goal_angle)/(alpha / dmin + 1);
-        cmd_vel.linear.x = fmin(fabs(0.2 / heading), 0.8);
+        cmd_vel.linear.x = fmin(fabs(0.2 / heading), 0.6);
         heading = fmax(fmin(heading, 0.8), -0.8);
         cmd_vel.angular.z = 0.8 * heading;
         return true;
