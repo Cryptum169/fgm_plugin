@@ -66,6 +66,10 @@ namespace fgm_plugin {
         void laserScanCallback(const sensor_msgs::LaserScan msg);
         void poseCallback(const geometry_msgs::Pose msg);
 
+        bool checkGoToGoal(float goal_angle);
+        int angleToSensorIdx(float goal_angle);
+        float goalDistance();
+
     private:
         // base_local_planner::LocalPlannerUtil planner_util_;
         std::string planner_name;
@@ -79,6 +83,8 @@ namespace fgm_plugin {
         ros::Publisher info_pub;
         ros::Subscriber laser_sub;
         ros::Subscriber pose_sub;
+
+        bool go_to_goal;
 
         geometry_msgs::PoseStamped goal_pose;
         geometry_msgs::Pose current_pose_;

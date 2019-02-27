@@ -6,6 +6,7 @@
 #include <string>
 #include <math.h>
 #include <cmath>
+// #include <math>
 #include <sstream>
 #include "std_msgs/String.h"
 #include <stdlib.h>
@@ -25,6 +26,7 @@ namespace fgm_plugin
         ros::Subscriber laser_sub;
         ros::Subscriber pose_sub;
         ros::Publisher gap_angle_pub;
+        go_to_goal = false;
 
     }
 
@@ -58,7 +60,7 @@ namespace fgm_plugin
     }
 
     bool FGMPlanner::isGoalReached() {
-        if (sqrt(pow(goal_pose.pose.position.y - current_pose_.position.y,2) + pow(goal_pose.pose.position.x - current_pose_.position.x,2)) < 0.5) {
+        if (goalDistance() < 0.5) {
             ROS_INFO_STREAM("Goal Reached");
             return true;
         } else {
@@ -87,6 +89,18 @@ namespace fgm_plugin
         yaw = fmod(yaw + 2 * PI, 2 * PI);
         goal_angle = fmod(goal_angle + 2 * PI, 2 * PI);
         goal_angle = goal_angle - yaw;
+
+        // Asus carried by turtlebot has 30cm diagnoal screen, let turtlebot clearance be 50cm
+
+        bool goal_path_clear = checkGoToGoal(goal_angle);
+
+        if (goal_path_clear) {
+            heading = goal_angle;
+            cmd_vel.linear.x = fmin(fabs(0.1 / heading), 0.6);
+            heading = fmax(fmin(heading, 0.8), -0.8);
+            cmd_vel.angular.z = 0.8 * heading;
+            return true;
+        }
 
         std::priority_queue <Gap, std::vector<Gap>, gapComparator> pq;        
         Gap currLarge(0,0,0,0,0);
@@ -147,7 +161,6 @@ namespace fgm_plugin
         // std::string s(ss.str());
 
         std_msgs::String angle_data;
-        // angle_data.data = std::to_string(gap_angle) + ',' + std::to_string(goal_angle);
         angle_data.data = ss.str();
         info_pub.publish(angle_data);
 
@@ -155,12 +168,46 @@ namespace fgm_plugin
         cmd_vel.linear.x = fmin(fabs(0.1 / heading), 0.6);
         heading = fmax(fmin(heading, 0.8), -0.8);
         cmd_vel.angular.z = 0.8 * heading;
+        
         return true;
-
     }
 
     FGMPlanner::~FGMPlanner() {
         ROS_INFO_STREAM("Terminated");
+    }
+
+    bool FGMPlanner::checkGoToGoal(float goal_angle) {
+        // Or traversable gap
+
+        bool return_value = true;
+        int goalIdx = angleToSensorIdx(goal_angle);
+        int goal_left_idx = angleToSensorIdx(goal_angle - asin(0.25/3));
+        int goal_right_idx = angleToSensorIdx(goal_angle + asin(0.25/3));
+        int access_idx = 0;
+
+        for (int j = goal_left_idx; j < goal_right_idx; ++j) {
+            if (j < 0) {
+                access_idx = j + 512;
+            } else {
+                access_idx = j;
+            }
+
+            return_value = return_value && (stored_scan_msgs.ranges[access_idx] > std::min(2.9f, goalDistance()));
+        }
+
+        return return_value;
+        
+        // TODO:
+        // Need to rework to check for entire path,
+        // go from goalIdx - 128 to goalIdx + 128, wrap around if necessary
+    }
+
+    int FGMPlanner::angleToSensorIdx(float goal_angle) {
+        return (int)((goal_angle - stored_scan_msgs.angle_min) / stored_scan_msgs.angle_increment);
+    }
+
+    float FGMPlanner::goalDistance(){
+        return sqrt(pow(goal_pose.pose.position.y - current_pose_.position.y,2) + pow(goal_pose.pose.position.x - current_pose_.position.x,2));
     }
 
 }
