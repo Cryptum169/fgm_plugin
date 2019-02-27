@@ -37,5 +37,6 @@
     <remap from="scan" to="/scan"/>
   </node>
   <node pkg="gazebo_fake_localization" type="gazebo_fake_localization" name="gazebo_fake_localization"/>
+  <node pkg="egocircle" type="ego_circle" name="ego_circle"/>
   <!-- <node pkg="fgm_plugin" type="ground_truth_odom" name="ground_truth_odom"/>    -->
 </launch>

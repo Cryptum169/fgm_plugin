@@ -24,6 +24,7 @@ namespace fgm_plugin
         ros::Publisher info_pub;
         ros::Subscriber laser_sub;
         ros::Subscriber pose_sub;
+        ros::Publisher gap_angle_pub;
 
     }
 
@@ -40,7 +41,8 @@ namespace fgm_plugin
     void FGMPlanner::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros) {
         alpha = 2.0;
         info_pub = nh.advertise<std_msgs::String>("planner_info", 100);
-        laser_sub = nh.subscribe("/scan", 100, &FGMPlanner::laserScanCallback, this);
+        // gap_angle_pub = nh.advertise<>
+        laser_sub = nh.subscribe("/point_scan", 100, &FGMPlanner::laserScanCallback, this);
         pose_sub = nh.subscribe("/robot_pose",10, &FGMPlanner::poseCallback, this);
 
         // costmap_2d::Costmap2D* costmap = costmap_ros_->getCostmap();
@@ -99,15 +101,15 @@ namespace fgm_plugin
         dmin = 10;
 
         // Generating Gaps
-        for(std::vector<float>::size_type it = 0; it < stored_scan_msgs.ranges.size(); ++it)
+        for(std::vector<float>::size_type it = 144; it < stored_scan_msgs.ranges.size() || it < 368; ++it)
         {
             if (prev) {
-                if (stored_scan_msgs.ranges[it] != stored_scan_msgs.ranges[it] || stored_scan_msgs.ranges[it] > 9.0) { // isnan
+                if (stored_scan_msgs.ranges[it] > 2.9) { // isnan
                     ++size;
                 } else {
                     r_dist = stored_scan_msgs.ranges[it];
                     dmin = fmin(dmin, r_dist);
-                    if (size > 20) {
+                    if (size > 11) {
                         // Filter out noise, tho rarely exists
                         pq.push(Gap(start_nan_idx, it, size, l_dist, r_dist));
                     }
@@ -116,7 +118,7 @@ namespace fgm_plugin
                     prev = false;
                 }
             } else {
-                if (stored_scan_msgs.ranges[it] != stored_scan_msgs.ranges[it] || stored_scan_msgs.ranges[it] > 9.0) { // isnan
+                if (stored_scan_msgs.ranges[it] > 2.9) { // isnan
                     start_nan_idx = it;
                     size = 1;
                     prev = true;
@@ -127,6 +129,7 @@ namespace fgm_plugin
             }
             // Populate obstacle here
         }
+
 
         if (prev) {
             pq.push(Gap(start_nan_idx, stored_scan_msgs.ranges.size() -1, size, l_dist, 0));
@@ -139,8 +142,17 @@ namespace fgm_plugin
             gap_angle = currLarge.getAngle();
         }
 
+        std::ostringstream ss;
+        ss << gap_angle;
+        // std::string s(ss.str());
+
+        std_msgs::String angle_data;
+        // angle_data.data = std::to_string(gap_angle) + ',' + std::to_string(goal_angle);
+        angle_data.data = ss.str();
+        info_pub.publish(angle_data);
+
         heading = (alpha / dmin * gap_angle + dmin * goal_angle)/(alpha / dmin + 1);
-        cmd_vel.linear.x = fmin(fabs(0.2 / heading), 0.6);
+        cmd_vel.linear.x = fmin(fabs(0.1 / heading), 0.6);
         heading = fmax(fmin(heading, 0.8), -0.8);
         cmd_vel.angular.z = 0.8 * heading;
         return true;
