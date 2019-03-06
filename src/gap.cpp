@@ -1,11 +1,12 @@
 #include <fgm_plugin/gap.h>
+// #ifndef
+#define PI 3.1415926
+// #endif
 
 Gap::Gap() {
     // place holder to return worst scenario
     goal_angle = 0;
     gap_angle = -3.1415926;
-    angle_increment = 0.0122718466446;
-    angle_min = -3.14159274101;
 }
 
 Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal)
@@ -29,12 +30,16 @@ Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal
     }
 
     float Gap::getAngle() {
+        angle_increment = 0.0122718466446;
+        angle_min = -3.14159274101;
         float gap_dir = (start_angle + end_angle) / 2 * angle_increment + angle_min;
         return gap_dir;
     }
 
     float Gap::getScore() const {
-        return fabs(goal_angle - gap_angle);
+        float val = goal_angle - gap_angle;
+        val = val > 0 ? fmod(val + 2 * PI, 2 * PI) : fmod(val - 2 * PI, 2 * PI);
+        return fabs(val);
     }
 
     float Gap::traversable() {
