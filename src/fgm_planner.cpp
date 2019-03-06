@@ -174,7 +174,7 @@ namespace fgm_plugin
             // ROS_INFO_STREAM(placeHolder.getAngle());
         }
 
-        ROS_INFO_STREAM(pq.size());
+        // ROS_INFO_STREAM(pq.size());
         
         // Calculate gap angle
         if (pq.size() != 0) {
@@ -193,18 +193,18 @@ namespace fgm_plugin
             ROS_INFO_STREAM("No Traversable gap found");
         }
 
-        ROS_INFO_STREAM("-------");
-        while (! pq.empty()) {
-            Gap this_gap = pq.top();
-            pq.pop();
-            ROS_INFO_STREAM(this_gap.getAngle());
-        }
-        ROS_INFO_STREAM("-------");
+        // ROS_INFO_STREAM("-------");
+        // while (! pq.empty()) {
+        //     Gap this_gap = pq.top();
+        //     pq.pop();
+        //     ROS_INFO_STREAM(this_gap.getAngle());
+        // }
+        // ROS_INFO_STREAM("-------");
 
-        ROS_INFO_STREAM(gap_angle);
-        ROS_INFO_STREAM("-------");
-        ROS_INFO_STREAM(goal_angle);
-        ROS_INFO_STREAM("_______");
+        // ROS_INFO_STREAM(gap_angle);
+        // ROS_INFO_STREAM("-------");
+        // ROS_INFO_STREAM(goal_angle);
+        // ROS_INFO_STREAM("_______");
 
         {
             std::ostringstream ss;
