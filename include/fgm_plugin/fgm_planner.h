@@ -14,6 +14,7 @@
 #include <base_local_planner/local_planner_util.h>
 #include <costmap_2d/costmap_2d_ros.h>
 #include <costmap_2d/costmap_2d.h>
+#include "gap.h"
 
 namespace fgm_plugin {
   /**
@@ -85,6 +86,7 @@ namespace fgm_plugin {
         ros::Subscriber pose_sub;
 
         bool go_to_goal;
+        Gap lastGap;
 
         geometry_msgs::PoseStamped goal_pose;
         geometry_msgs::Pose current_pose_;

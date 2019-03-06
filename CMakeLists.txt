@@ -122,7 +122,7 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
 )
-add_library(fgm_plugin src/fgm_planner.cpp)
+add_library(fgm_plugin src/fgm_planner.cpp src/gap.cpp)
 add_executable(ground_truth_odom src/ground_truth.cpp)
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}

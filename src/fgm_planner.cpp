@@ -27,7 +27,7 @@ namespace fgm_plugin
         ros::Subscriber pose_sub;
         ros::Publisher gap_angle_pub;
         go_to_goal = false;
-
+        Gap lastGap();
     }
 
     void FGMPlanner::laserScanCallback(const sensor_msgs::LaserScan msg) {
@@ -62,6 +62,7 @@ namespace fgm_plugin
     bool FGMPlanner::isGoalReached() {
         if (goalDistance() < 0.5) {
             ROS_INFO_STREAM("Goal Reached");
+            Gap lastGap();
             return true;
         } else {
             return false;
@@ -86,24 +87,32 @@ namespace fgm_plugin
         // double pose_y = current_pose_2.getOrigin().getY();
         // double yaw = tf::getYaw(current_pose_2.getRotation());
         // goal_angle = atan2(goal_pose.pose.position.y - pose_y, goal_pose.pose.position.x - pose_y);
-        yaw = fmod(yaw + 2 * PI, 2 * PI);
-        goal_angle = fmod(goal_angle + 2 * PI, 2 * PI);
+        yaw = fmod(yaw + 2 * PI, 2 * PI) - PI;
+        goal_angle = fmod(goal_angle + 2 * PI, 2 * PI) - PI;
         goal_angle = goal_angle - yaw;
+        goal_angle = goal_angle > 0 ? fmod(goal_angle + 2 * PI, 2 * PI) : fmod(goal_angle - 2 * PI, 2 * PI);
+
+        // ROS_INFO_STREAM("Goal Angle:");
+        // ROS_INFO_STREAM(goal_angle);
 
         // Asus carried by turtlebot has 30cm diagnoal screen, let turtlebot clearance be 50cm
 
         bool goal_path_clear = checkGoToGoal(goal_angle);
 
-        if (goal_path_clear) {
-            heading = goal_angle;
-            cmd_vel.linear.x = fmin(fabs(0.1 / heading), 0.6);
-            heading = fmax(fmin(heading, 0.8), -0.8);
-            cmd_vel.angular.z = 0.8 * heading;
-            return true;
-        }
+        // if (goal_path_clear) {
+        //     heading = goal_angle;
+        //     cmd_vel.linear.x = fmin(fabs(0.1 / heading), 0.6);
+        //     // cmd_vel.linear.x = 0;
+        //     heading = fmax(fmin(heading, 0.8), -0.8);
+        //     cmd_vel.angular.z = 0.8 * heading;
+        //     return true;
+        // }
 
         std::priority_queue <Gap, std::vector<Gap>, gapComparator> pq;        
-        Gap currLarge(0,0,0,0,0);
+        // This is a place holder
+        Gap currLarge(0,0,0,0,0, goal_angle);
+        // currLarge.setGoalAngle(goal_angle);
+        // currLarge.setSensorModel(stored_scan_msgs.angle_increment, stored_scan_msgs.angle_min);
         gap_angle = 0;
 
         // Compute gaps
@@ -125,7 +134,11 @@ namespace fgm_plugin
                     dmin = fmin(dmin, r_dist);
                     if (size > 11) {
                         // Filter out noise, tho rarely exists
-                        pq.push(Gap(start_nan_idx, it, size, l_dist, r_dist));
+                        Gap newGap(start_nan_idx, it, size, l_dist, r_dist, goal_angle);
+                        // if (newGap.traversable() == 1) {
+                            pq.push(newGap);
+                        // }
+                        // pq.push(Gap(start_nan_idx, it, size, l_dist, r_dist));
                     }
                     start_nan_idx = -1;
                     size = 0;
@@ -144,31 +157,49 @@ namespace fgm_plugin
             // Populate obstacle here
         }
 
-
         if (prev) {
-            pq.push(Gap(start_nan_idx, stored_scan_msgs.ranges.size() -1, size, l_dist, 0));
+            Gap placeHolder(start_nan_idx, stored_scan_msgs.ranges.size() -1, size, l_dist, 0, goal_angle);        
+            // pq.push(Gap(start_nan_idx, stored_scan_msgs.ranges.size() -1, size, l_dist, 0, goal_angle));
+            pq.push(placeHolder);
+            ROS_INFO_STREAM("No gap detected");
+            ROS_INFO_STREAM(placeHolder.getAngle());
         }
         
         // Calculate gap angle
         if (pq.size() != 0) {
             currLarge = pq.top();
-            currLarge.setSensorModel(stored_scan_msgs.angle_increment, stored_scan_msgs.angle_min);
-            gap_angle = currLarge.getAngle();
+            if (currLarge.getScore() < lastGap.getScore() / 1.5 && lastGap.getScore() > 0.1) {
+                gap_angle = currLarge.getAngle();
+                lastGap = currLarge;
+                ROS_INFO_STREAM("switched to");
+                ROS_INFO_STREAM(currLarge.getAngle());
+            } else {
+                ROS_INFO_STREAM("not switched");
+                ROS_INFO_STREAM(lastGap.getAngle());
+                gap_angle = lastGap.getAngle();
+            }
+        } else {
+            ROS_INFO_STREAM("No Traversable gap found");
         }
 
-        std::ostringstream ss;
-        ss << gap_angle;
-        // std::string s(ss.str());
+        // ROS_INFO_STREAM(gap_angle);
 
-        std_msgs::String angle_data;
-        angle_data.data = ss.str();
-        info_pub.publish(angle_data);
+        {
+            std::ostringstream ss;
+            ss << gap_angle;
+            std_msgs::String angle_data;
+            angle_data.data = ss.str();
+            info_pub.publish(angle_data);
+        }
 
-        heading = (alpha / dmin * gap_angle + dmin * goal_angle)/(alpha / dmin + 1);
-        cmd_vel.linear.x = fmin(fabs(0.1 / heading), 0.6);
+        // heading = (alpha / dmin * gap_angle + dmin * goal_angle)/(alpha / dmin + 1);
+        heading = goal_angle;
+        // cmd_vel.linear.x = fmin(fabs(0.1 / heading), 0.6);
+        cmd_vel.linear.x = 0.0;
         heading = fmax(fmin(heading, 0.8), -0.8);
+        // heading = 0;
         cmd_vel.angular.z = 0.8 * heading;
-        
+   
         return true;
     }
 
