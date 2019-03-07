@@ -55,7 +55,8 @@ namespace fgm_plugin
 
     bool FGMPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan) {
         // plan is the global plan to follow, assumes last entry of plan is the goal
-        goal_pose = plan.back();
+        int plan_length = plan.size();
+        goal_pose = plan.at(round(plan_length / 10));
         return true;
     }
 
