@@ -124,6 +124,7 @@ include_directories(
 )
 add_library(fgm_plugin src/fgm_planner.cpp src/gap.cpp)
 add_executable(ground_truth_odom src/ground_truth.cpp)
+add_executable(level_gap src/level_gap.cpp)
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/fgm_plugin.cpp
@@ -132,6 +133,7 @@ add_executable(ground_truth_odom src/ground_truth.cpp)
 # add_dependencies(dwa_local_planner ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(fgm_plugin ${catkin_LIBRARIES})
 target_link_libraries(ground_truth_odom ${catkin_LIBRARIES})
+target_link_libraries(level_gap ${catkin_LIBRARIES})
 # target_link_libraries(plugin_quiz ${catkin_LIBRARIES} dwa_local_planner)
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
