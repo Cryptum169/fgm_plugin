@@ -15,6 +15,9 @@
 #include <costmap_2d/costmap_2d_ros.h>
 #include <costmap_2d/costmap_2d.h>
 #include "gap.h"
+#include <vector>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 namespace fgm_plugin {
   /**
@@ -71,6 +74,8 @@ namespace fgm_plugin {
         int angleToSensorIdx(float goal_angle);
         float goalDistance();
 
+        void pathVisualization(visualization_msgs::MarkerArray *vis_arr, float dir, int hash);
+
     private:
         // base_local_planner::LocalPlannerUtil planner_util_;
         std::string planner_name;
@@ -82,6 +87,7 @@ namespace fgm_plugin {
         float alpha;
         ros::NodeHandle nh;
         ros::Publisher info_pub;
+        ros::Publisher vis_pub;
         ros::Subscriber laser_sub;
         ros::Subscriber pose_sub;
 

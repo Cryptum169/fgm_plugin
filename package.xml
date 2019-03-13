@@ -67,6 +67,8 @@
   <exec_depend>pluginlib</exec_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>nav_core</exec_depend>
+  <exec_depend>egocircle</exec_depend>
+  
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
