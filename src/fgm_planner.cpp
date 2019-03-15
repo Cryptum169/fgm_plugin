@@ -13,8 +13,9 @@
 #include <fgm_plugin/fgm_planner.h>
 #include <fgm_plugin/gap_comparator.h>
 
-
+#ifndef PI
 #define PI 3.1415926
+#endif
 
 PLUGINLIB_EXPORT_CLASS(fgm_plugin::FGMPlanner, nav_core::BaseLocalPlanner)
 
@@ -28,6 +29,7 @@ namespace fgm_plugin
         ros::Subscriber pose_sub;
         ros::Publisher gap_angle_pub;
         go_to_goal = false;
+        gap_switch_counter = 0;
         Gap lastGap();
     }
 
@@ -49,8 +51,6 @@ namespace fgm_plugin
         laser_sub = nh.subscribe("/point_scan", 100, &FGMPlanner::laserScanCallback, this);
         pose_sub = nh.subscribe("/robot_pose",10, &FGMPlanner::poseCallback, this);
 
-        // costmap_2d::Costmap2D* costmap = costmap_ros_->getCostmap();
-        // planner_util_.initialize(tf, costmap, costmap_ros_->getGlobalFrameID());
         ROS_INFO_STREAM("FGMPlanner initialized");
 
     }
@@ -76,22 +76,12 @@ namespace fgm_plugin
     bool FGMPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel) {
         visualization_msgs::MarkerArray vis_arr;
         // used perfect localization
-        // sharedPtr_pose = ros::topic::waitForMessage<geometry_msgs::Pose>("/robot_pose", ros::Duration(1));
-        // if (sharedPtr_pose == NULL) {
-        //     ROS_ERROR("Planner received no odom!");
-        // } else {
-        //     current_pose_ = (*sharedPtr_pose);
-        // }
 
         double yaw = atan2(2.0 * (current_pose_.orientation.w * current_pose_.orientation.z + current_pose_.orientation.x * current_pose_.orientation.y),
             1.0 - 2.0 * (current_pose_.orientation.y * current_pose_.orientation.y + current_pose_.orientation.z * current_pose_.orientation.z));
         goal_angle = atan2(goal_pose.pose.position.y - current_pose_.position.y, goal_pose.pose.position.x - current_pose_.position.x);
 
-        // costmap_ros_->getRobotPose(current_pose_2);
-        // double pose_x = current_pose_2.getOrigin().getX();
-        // double pose_y = current_pose_2.getOrigin().getY();
-        // double yaw = tf::getYaw(current_pose_2.getRotation());
-        // goal_angle = atan2(goal_pose.pose.position.y - pose_y, goal_pose.pose.position.x - pose_y);
+
         yaw = fmod(yaw + 2 * PI, 2 * PI) - PI;
         goal_angle = fmod(goal_angle + 2 * PI, 2 * PI) - PI;
         goal_angle = goal_angle - yaw;
@@ -104,17 +94,9 @@ namespace fgm_plugin
                 goal_angle += 2 * PI;
             }
         }
-        pathVisualization(&vis_arr, goal_angle, 0);
-        // vis_pub.publish(vis_arr);
-
-        // goal_angle = goal_angle > 0 ? fmod(goal_angle + 2 * PI, 2 * PI) : fmod(goal_angle - 2 * PI, 2 * PI);
-
-        // ROS_INFO_STREAM("Goal Angle:");
-        // ROS_INFO_STREAM(goal_angle);
-
-        // Asus carried by turtlebot has 30cm diagnoal screen, let turtlebot clearance be 50cm
 
         bool goal_path_clear = checkGoToGoal(goal_angle);
+        ROS_INFO_STREAM(goal_path_clear);
 
         if (goal_path_clear) {
             heading = goal_angle;
@@ -128,8 +110,6 @@ namespace fgm_plugin
         std::priority_queue <Gap, std::vector<Gap>, gapComparator> pq;        
         // This is a place holder
         Gap currLarge(0,0,0,0,0, goal_angle);
-        // currLarge.setGoalAngle(goal_angle);
-        // currLarge.setSensorModel(stored_scan_msgs.angle_increment, stored_scan_msgs.angle_min);
         gap_angle = 0;
 
         // Compute gaps
@@ -141,6 +121,7 @@ namespace fgm_plugin
         dmin = 10;
 
         // Generating Gaps
+        // Limited fov
         for(std::vector<float>::size_type it = 144; it < stored_scan_msgs.ranges.size() && it < 368; ++it)
         {
             if (prev) {
@@ -149,13 +130,12 @@ namespace fgm_plugin
                 } else {
                     r_dist = stored_scan_msgs.ranges[it];
                     dmin = fmin(dmin, r_dist);
-                    if (size > 2) {
+                    if (size > 10) {
                         // Filter out noise, tho rarely exists
-                        // Gap newGap(start_nan_idx, it, size, l_dist, r_dist, goal_angle);
-                        // if (newGap.traversable() == 1) {
-                        // pq.push(newGap);
-                        // }
-                        pq.push(Gap(start_nan_idx, it, size, l_dist, r_dist, goal_angle));
+                        Gap newGap(start_nan_idx, it, size, l_dist, r_dist, goal_angle);
+                        if (newGap.traversable() == 1) {
+                            pq.push(newGap);
+                        }
                     }
                     start_nan_idx = -1;
                     size = 0;
@@ -174,33 +154,38 @@ namespace fgm_plugin
             // Populate obstacle here
         }
 
+        // Account for error
         if (prev) {
             Gap placeHolder(start_nan_idx, 368 - 1, size, l_dist, 0, goal_angle);        
-            // pq.push(Gap(start_nan_idx, stored_scan_msgs.ranges.size() -1, size, l_dist, 0, goal_angle));
             pq.push(placeHolder);
-            // ROS_INFO_STREAM("No gap detected");
-            // ROS_INFO_STREAM(placeHolder.getAngle());
         }
 
-        // ROS_INFO_STREAM(pq.size());
-        
         // Calculate gap angle
+        // Do Sticky gap implementation
+        // NOT STICKY YET
         if (pq.size() != 0) {
             currLarge = pq.top();
             if (currLarge.getScore() < lastGap.getScore() / 1.5 && lastGap.getScore() > 0.1) {
                 gap_angle = currLarge.getAngle();
+                gap_switch_counter = 0;
                 lastGap = currLarge;
-                // ROS_INFO_STREAM("switched to");
-                // ROS_INFO_STREAM(currLarge.getAngle());
             } else {
-                // ROS_INFO_STREAM("not switched");
-                // ROS_INFO_STREAM(lastGap.getAngle());
-                gap_angle = lastGap.getAngle();
+                if (gap_switch_counter < 3) {
+                    gap_angle = lastGap.getAngle();
+                    gap_switch_counter = 0;
+                } else {
+                    gap_angle = currLarge.getAngle();
+                    gap_switch_counter = 0;
+                    lastGap = currLarge;
+                }
             }
+            gap_angle = currLarge.getAngle();
         } else {
-            ROS_INFO_STREAM("No Traversable gap found");
+            ROS_DEBUG_STREAM("No Traversable gap found");
+            // POTENTIAL HAZARD
         }
 
+        // Questionable usefulness 
         {
             std::ostringstream ss;
             ss << gap_angle;
@@ -210,17 +195,10 @@ namespace fgm_plugin
         }
 
         pathVisualization(&vis_arr, gap_angle, 1);
-        // vis_pub.publish(vis_arr);
 
         heading = (alpha / dmin * gap_angle + dmin * goal_angle)/(alpha / dmin + dmin);
-        pathVisualization(&vis_arr, heading, 2);
-        // vis_pub.publish(vis_arr);
-        // ROS_INFO_STREAM(heading);
-        // heading = goal_angle;
         cmd_vel.linear.x = fmin(fabs(0.1 / heading), 0.6);
-        // cmd_vel.linear.x = 0.0;
         heading = fmax(fmin(heading, 0.8), -0.8);
-        // heading = 0;
         cmd_vel.angular.z = 0.8 * heading;
         return true;
     }
@@ -231,8 +209,6 @@ namespace fgm_plugin
 
     bool FGMPlanner::checkGoToGoal(float goal_angle) {
         // Or traversable gap
-
-        bool return_value = true;
         int goalIdx = angleToSensorIdx(goal_angle);
         int goal_left_idx = angleToSensorIdx(goal_angle - asin(0.25/3));
         int goal_right_idx = angleToSensorIdx(goal_angle + asin(0.25/3));
@@ -244,15 +220,41 @@ namespace fgm_plugin
             } else {
                 access_idx = j;
             }
-
-            return_value = return_value && (stored_scan_msgs.ranges[access_idx] > std::min(2.9f, goalDistance()));
+            if (stored_scan_msgs.ranges[access_idx] < std::min(2.9f, goalDistance())) {
+                return false;
+            };
         }
 
-        return return_value;
-        
-        // TODO:
-        // Need to rework to check for entire path,
-        // go from goalIdx - 128 to goalIdx + 128, wrap around if necessary
+        float dist = 0;
+        float min_clearance = 0;
+        int max_check_idx = angleToSensorIdx(goal_angle - atan2(goalDistance(), 0.2));
+        max_check_idx = max_check_idx < 0? max_check_idx += 512 : max_check_idx;
+        int i = 0;
+        // ROS_INFO_STREAM(max_check_idx);
+        for (int j = goalIdx - 128; j < max_check_idx && j < goal_left_idx; j++) {
+            access_idx = j < 0 ? j += 512 : j;
+            dist = stored_scan_msgs.ranges[access_idx];
+            min_clearance = dist * cos(i * stored_scan_msgs.angle_increment);
+            if (min_clearance < 0.4) {
+                return false;
+            }
+            i++;
+        }
+
+        i = 0;
+        int min_check_idx = angleToSensorIdx(goal_angle + atan2(goalDistance(), 0.2));
+        min_check_idx = min_check_idx > 512? min_check_idx -= 512 : min_check_idx;
+        for (int j = goalIdx + 128; j > min_check_idx && j > goal_left_idx; j--) {
+            access_idx = j < 0 ? j += 512 : j;
+            access_idx = j > 512 ? j -= 512 : j;
+            dist = stored_scan_msgs.ranges[access_idx];
+            min_clearance = dist * cos(i * stored_scan_msgs.angle_increment);
+            if (min_clearance < 0.4) {
+                return false;
+            }
+            i++;
+        }
+        return true;
     }
 
     int FGMPlanner::angleToSensorIdx(float goal_angle) {

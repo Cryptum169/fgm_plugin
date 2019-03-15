@@ -1,7 +1,8 @@
 #include <fgm_plugin/gap.h>
-// #ifndef
+
+#ifndef PI
 #define PI 3.1415926
-// #endif
+#endif
 
 Gap::Gap() {
     // place holder to return worst scenario
@@ -31,8 +32,10 @@ Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal
 
     float Gap::getAngle() {
         angle_increment = 0.0122718466446;
-        angle_min = -3.14159274101;
+        angle_min = -3.14159274101; // Returned by sensor message
         float gap_dir = (start_angle + end_angle) / 2 * angle_increment + angle_min;
+        // Very little actual performance issue in finding center of observed gap and actual gap
+        // For computation performance, went with observed gap here
         return gap_dir;
     }
 
@@ -44,8 +47,9 @@ Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal
 
     float Gap::traversable() {
         float dist = fmin(left_dist, right_dist);
-        float clearance = 2 * dist * sin((start_angle - end_angle) * angle_increment / 2);
-        if (clearance > 0.1) {
+        float clearance = 2 * dist * sin((end_angle - start_angle) * angle_increment / 2);
+        // TODO: Set for rectangular path
+        if (clearance > 0.3) {
             return 1;
         } else {
             return 0;

@@ -85,6 +85,7 @@ namespace fgm_plugin {
         float heading;
         float dmin;
         float alpha;
+        int gap_switch_counter;
         ros::NodeHandle nh;
         ros::Publisher info_pub;
         ros::Publisher vis_pub;

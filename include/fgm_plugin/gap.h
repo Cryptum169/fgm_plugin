@@ -5,6 +5,7 @@
 #include <cmath>
 class Gap
 {
+  private:
     int start_angle;
     int size;
     float left_dist;
