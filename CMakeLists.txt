@@ -14,7 +14,13 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   gazebo_msgs
   gazebo_fake_localization
+  dynamic_reconfigure
+  nav_msgs
 )
+
+# generate_dynamic_reconfigure_options(
+#     cfg/FGMPlanner.cfg
+# )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)

@@ -10,7 +10,6 @@
 #include <sensor_msgs/LaserScan.h>
 #include <boost/shared_ptr.hpp>
 #include <nav_msgs/Odometry.h>
-// #include <local_planner_util.h>
 #include <base_local_planner/local_planner_util.h>
 #include <costmap_2d/costmap_2d_ros.h>
 #include <costmap_2d/costmap_2d.h>
@@ -18,6 +17,7 @@
 #include <vector>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <dynamic_reconfigure/server.h>
 
 namespace fgm_plugin {
   /**

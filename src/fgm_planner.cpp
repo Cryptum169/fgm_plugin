@@ -96,7 +96,6 @@ namespace fgm_plugin
         }
 
         bool goal_path_clear = checkGoToGoal(goal_angle);
-        ROS_INFO_STREAM(goal_path_clear);
 
         if (goal_path_clear) {
             heading = goal_angle;
