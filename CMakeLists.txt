@@ -18,9 +18,9 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
 )
 
-# generate_dynamic_reconfigure_options(
-#     cfg/FGMPlanner.cfg
-# )
+generate_dynamic_reconfigure_options(
+     cfg/FGMPlanner.cfg
+)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -116,6 +116,7 @@ catkin_package(
 #  LIBRARIES fgm_plugin
 #  CATKIN_DEPENDS pluginlib roscpp
 #  DEPENDS system_lib
+  CATKIN_DEPENDS dynamic_reconfigure roscpp sensor_msgs
 )
 
 ###########
@@ -129,6 +130,7 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 add_library(fgm_plugin src/fgm_planner.cpp src/gap.cpp)
+add_dependencies(fgm_plugin ${PROJECT_NAME}_gencfg)
 add_executable(ground_truth_odom src/ground_truth.cpp)
 add_executable(level_gap src/level_gap.cpp)
 ## Declare a C++ library

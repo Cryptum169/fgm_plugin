@@ -18,6 +18,7 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <dynamic_reconfigure/server.h>
+#include <fgm_plugin/FGMConfig.h>
 
 namespace fgm_plugin {
   /**
@@ -76,6 +77,8 @@ namespace fgm_plugin {
 
         void pathVisualization(visualization_msgs::MarkerArray *vis_arr, float dir, int hash);
 
+        void reconfigureCb(fgm_plugin::FGMConfig& config, uint32_t level);
+
     private:
         // base_local_planner::LocalPlannerUtil planner_util_;
         std::string planner_name;
@@ -105,6 +108,9 @@ namespace fgm_plugin {
         // boost::shared_ptr<nav_msgs::Odometry const> sharedPtr_pose;
         // costmap_2d::Costmap2DROS* costmap_ros_;
         tf::Stamped<tf::Pose> current_pose_2;
+
+        dynamic_reconfigure::Server<fgm_plugin::FGMConfig> server;
+        dynamic_reconfigure::Server<fgm_plugin::FGMConfig>::CallbackType f;
   };
 };
 #endif

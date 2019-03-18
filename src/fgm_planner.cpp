@@ -44,12 +44,16 @@ namespace fgm_plugin
     }
 
     void FGMPlanner::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros) {
+        // srv_(nh);
         alpha = 2.0;
         info_pub = nh.advertise<std_msgs::String>("planner_info", 100);
         // gap_angle_pub = nh.advertise<>
         vis_pub = nh.advertise<visualization_msgs::Marker>("/viz_array", 3000);
         laser_sub = nh.subscribe("/point_scan", 100, &FGMPlanner::laserScanCallback, this);
         pose_sub = nh.subscribe("/robot_pose",10, &FGMPlanner::poseCallback, this);
+
+        f = boost::bind(&FGMPlanner::reconfigureCb, this, _1, _2);
+        server.setCallback(f);
 
         ROS_INFO_STREAM("FGMPlanner initialized");
 
@@ -204,6 +208,10 @@ namespace fgm_plugin
 
     FGMPlanner::~FGMPlanner() {
         ROS_INFO_STREAM("Terminated");
+    }
+
+    void reconfigureCb(fgm_plugin::FGMConfig& config, uint32_t level) {
+        ROS_INFO_STREAM(config.scan_height);
     }
 
     bool FGMPlanner::checkGoToGoal(float goal_angle) {
