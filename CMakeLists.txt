@@ -14,6 +14,12 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   gazebo_msgs
   gazebo_fake_localization
+  dynamic_reconfigure
+  nav_msgs
+)
+
+generate_dynamic_reconfigure_options(
+     cfg/FGMPlanner.cfg
 )
 
 ## System dependencies are found with CMake's conventions
@@ -110,6 +116,7 @@ catkin_package(
 #  LIBRARIES fgm_plugin
 #  CATKIN_DEPENDS pluginlib roscpp
 #  DEPENDS system_lib
+  CATKIN_DEPENDS dynamic_reconfigure roscpp sensor_msgs
 )
 
 ###########
@@ -122,8 +129,10 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
 )
-add_library(fgm_plugin src/fgm_planner.cpp)
+add_library(fgm_plugin src/fgm_planner.cpp src/gap.cpp)
+add_dependencies(fgm_plugin ${PROJECT_NAME}_gencfg)
 add_executable(ground_truth_odom src/ground_truth.cpp)
+add_executable(level_gap src/level_gap.cpp)
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/fgm_plugin.cpp
@@ -132,6 +141,7 @@ add_executable(ground_truth_odom src/ground_truth.cpp)
 # add_dependencies(dwa_local_planner ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(fgm_plugin ${catkin_LIBRARIES})
 target_link_libraries(ground_truth_odom ${catkin_LIBRARIES})
+target_link_libraries(level_gap ${catkin_LIBRARIES})
 # target_link_libraries(plugin_quiz ${catkin_LIBRARIES} dwa_local_planner)
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries

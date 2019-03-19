@@ -5,6 +5,7 @@
 #include <cmath>
 class Gap
 {
+  private:
     int start_angle;
     int size;
     float left_dist;
@@ -12,31 +13,24 @@ class Gap
     int end_angle;
     float angle_increment;
     float angle_min;
-    static float goal_angle;
+    float gap_score;
+    float goal_angle;
+    float gap_angle;
 
   public:
-    Gap(int _start, int _end, int _size, float l_dist, float r_dist)
-    {
-        start_angle = _start;
-        end_angle = _end;
-        left_dist = l_dist;
-        right_dist = r_dist;
-    }
+    Gap();
+    Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal);
 
-    void setGoalAngle(float _goal_angle) {
-        goal_angle = _goal_angle;
-    }
+    void setGoalAngle(float _goal_angle);
 
-    void setSensorModel(float _increment, float _min) {
-        angle_increment = _increment;
-        angle_min = _min;
-    }
+    void setSensorModel(float _increment, float _min);
 
-    float getAngle() {
-        float gap_size = (start_angle + end_angle) / 2 * angle_increment + angle_min;
-        return gap_size;
-    }
-    int getSize() const { return size; }
+    float getAngle();
+
+    float getScore() const;
+    float traversable();
+
+    int getSize() const;
 };
 #else
 #endif

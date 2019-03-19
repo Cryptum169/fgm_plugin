@@ -99,7 +99,7 @@
           <geometry>
             <cylinder>
               <radius>0.5</radius>
-              <length>1</length>
+              <length>0.3</length>
             </cylinder>
           </geometry>
           <max_contacts>10</max_contacts>
@@ -120,7 +120,7 @@
           <geometry>
             <cylinder>
               <radius>0.5</radius>
-              <length>1</length>
+              <length>0.3</length>
             </cylinder>
           </geometry>
           <material>

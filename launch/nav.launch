@@ -13,6 +13,5 @@
 
   <!-- Move base -->
  <include file="$(find fgm_plugin)/launch/includes/move_base.launch.xml"/>
- <node pkg="gazebo_fake_localization" type="gazebo_fake_localization" name="gazebo_fake_localization"/>
  <node pkg="robot_pose_publisher" type="robot_pose_publisher" name="robot_pose_publisher"/>
 </launch>

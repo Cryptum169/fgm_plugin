@@ -10,10 +10,15 @@
 #include <sensor_msgs/LaserScan.h>
 #include <boost/shared_ptr.hpp>
 #include <nav_msgs/Odometry.h>
-// #include <local_planner_util.h>
 #include <base_local_planner/local_planner_util.h>
 #include <costmap_2d/costmap_2d_ros.h>
 #include <costmap_2d/costmap_2d.h>
+#include "gap.h"
+#include <vector>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
+#include <dynamic_reconfigure/server.h>
+#include <fgm_plugin/FGMConfig.h>
 
 namespace fgm_plugin {
   /**
@@ -63,8 +68,19 @@ namespace fgm_plugin {
          */
         void initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros);
 
+        // Callback functions
         void laserScanCallback(const sensor_msgs::LaserScan msg);
         void poseCallback(const geometry_msgs::Pose msg);
+        void reconfigureCb(fgm_plugin::FGMConfig& config, uint32_t level);
+
+        // Utility functions
+        bool checkGoToGoal(float goal_angle);
+        int angleToSensorIdx(float goal_angle);
+        float goalDistance();
+
+        // Visualization
+        void pathVisualization(visualization_msgs::MarkerArray vis_arr, float goal_angle, float gap_angle, float heading, int mode);
+
 
     private:
         // base_local_planner::LocalPlannerUtil planner_util_;
@@ -75,10 +91,15 @@ namespace fgm_plugin {
         float heading;
         float dmin;
         float alpha;
+        int gap_switch_counter;
+        int start_index;
         ros::NodeHandle nh;
         ros::Publisher info_pub;
+        ros::Publisher vis_pub;
         ros::Subscriber laser_sub;
         ros::Subscriber pose_sub;
+
+        Gap lastGap;
 
         geometry_msgs::PoseStamped goal_pose;
         geometry_msgs::Pose current_pose_;
@@ -90,6 +111,17 @@ namespace fgm_plugin {
         // boost::shared_ptr<nav_msgs::Odometry const> sharedPtr_pose;
         // costmap_2d::Costmap2DROS* costmap_ros_;
         tf::Stamped<tf::Pose> current_pose_2;
+
+        boost::shared_ptr<dynamic_reconfigure::Server<fgm_plugin::FGMConfig> > dynamic_recfg_server;
+        dynamic_reconfigure::Server<fgm_plugin::FGMConfig>::CallbackType f;
+
+        // Reconfigurable Parameters
+        float max_linear_x;
+        float max_angular_z;
+        float fov;
+        bool go_to_goal;
+        int sub_goal_idx;
+        float goal_distance_tolerance;
   };
 };
 #endif
