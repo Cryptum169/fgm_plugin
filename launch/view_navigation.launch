@@ -1,0 +1,3 @@
+<launch>
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find fgm_plugin)/cfg/fgm_rviz.rviz"/>
+</launch>

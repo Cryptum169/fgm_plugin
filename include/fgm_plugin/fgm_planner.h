@@ -68,16 +68,19 @@ namespace fgm_plugin {
          */
         void initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros);
 
+        // Callback functions
         void laserScanCallback(const sensor_msgs::LaserScan msg);
         void poseCallback(const geometry_msgs::Pose msg);
+        void reconfigureCb(fgm_plugin::FGMConfig& config, uint32_t level);
 
+        // Utility functions
         bool checkGoToGoal(float goal_angle);
         int angleToSensorIdx(float goal_angle);
         float goalDistance();
 
-        void pathVisualization(visualization_msgs::MarkerArray *vis_arr, float dir, int hash);
+        // Visualization
+        void pathVisualization(visualization_msgs::MarkerArray vis_arr, float goal_angle, float gap_angle, float heading, int mode);
 
-        void reconfigureCb(fgm_plugin::FGMConfig& config, uint32_t level);
 
     private:
         // base_local_planner::LocalPlannerUtil planner_util_;
@@ -89,13 +92,13 @@ namespace fgm_plugin {
         float dmin;
         float alpha;
         int gap_switch_counter;
+        int start_index;
         ros::NodeHandle nh;
         ros::Publisher info_pub;
         ros::Publisher vis_pub;
         ros::Subscriber laser_sub;
         ros::Subscriber pose_sub;
 
-        bool go_to_goal;
         Gap lastGap;
 
         geometry_msgs::PoseStamped goal_pose;
@@ -109,8 +112,16 @@ namespace fgm_plugin {
         // costmap_2d::Costmap2DROS* costmap_ros_;
         tf::Stamped<tf::Pose> current_pose_2;
 
-        dynamic_reconfigure::Server<fgm_plugin::FGMConfig> server;
+        boost::shared_ptr<dynamic_reconfigure::Server<fgm_plugin::FGMConfig> > dynamic_recfg_server;
         dynamic_reconfigure::Server<fgm_plugin::FGMConfig>::CallbackType f;
+
+        // Reconfigurable Parameters
+        float max_linear_x;
+        float max_angular_z;
+        float fov;
+        bool go_to_goal;
+        int sub_goal_idx;
+        float goal_distance_tolerance;
   };
 };
 #endif

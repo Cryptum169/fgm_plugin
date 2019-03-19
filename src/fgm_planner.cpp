@@ -22,7 +22,7 @@ PLUGINLIB_EXPORT_CLASS(fgm_plugin::FGMPlanner, nav_core::BaseLocalPlanner)
 namespace fgm_plugin
 {
     FGMPlanner::FGMPlanner() {
-        ros::NodeHandle nh;
+        ros::NodeHandle nh("~/fgm_planner_node");
         ros::Publisher info_pub;
         ros::Publisher vis_pub;
         ros::Subscriber laser_sub;
@@ -30,6 +30,7 @@ namespace fgm_plugin
         ros::Publisher gap_angle_pub;
         go_to_goal = false;
         gap_switch_counter = 0;
+        dynamic_recfg_server = boost::make_shared<dynamic_reconfigure::Server<fgm_plugin::FGMConfig> >(nh);
         Gap lastGap();
     }
 
@@ -43,33 +44,50 @@ namespace fgm_plugin
         current_pose_ = msg;
     }
 
+    void FGMPlanner::reconfigureCb(fgm_plugin::FGMConfig& config, uint32_t level) {
+        // Reconfigure Parameter
+        max_linear_x = (float)config.max_linear;
+        max_angular_z = (float)config.max_angular;
+        fov = (float)config.fov;
+        go_to_goal = config.go_to_goal;
+        sub_goal_idx = config.sub_goal_idx;
+        goal_distance_tolerance = (float)config.goal_tolerance;
+        alpha = (float)config.alpha;
+
+        ROS_DEBUG("Reconfigure:\n"
+        "Max Linear: %f\n"
+        "Max Angular: %f\n"
+        "Field of View: %f\n"
+        "Go to Goal Behavior: %s\n"
+        "Subgoal Index: %d\n"
+        "Goal Test Tolerance: %f\n"
+        "Alpha: %f",max_linear_x,max_angular_z,fov,go_to_goal? "True":"False",
+        sub_goal_idx, goal_distance_tolerance, alpha);
+        start_index = 256 - fov / 360 * 512 / 2;
+    }
+
     void FGMPlanner::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros) {
-        // srv_(nh);
-        alpha = 2.0;
         info_pub = nh.advertise<std_msgs::String>("planner_info", 100);
-        // gap_angle_pub = nh.advertise<>
-        vis_pub = nh.advertise<visualization_msgs::Marker>("/viz_array", 3000);
+        vis_pub = nh.advertise<visualization_msgs::MarkerArray>("/viz_array", 3000);
         laser_sub = nh.subscribe("/point_scan", 100, &FGMPlanner::laserScanCallback, this);
         pose_sub = nh.subscribe("/robot_pose",10, &FGMPlanner::poseCallback, this);
 
         f = boost::bind(&FGMPlanner::reconfigureCb, this, _1, _2);
-        server.setCallback(f);
-
-        ROS_INFO_STREAM("FGMPlanner initialized");
-
+        dynamic_recfg_server->setCallback(f);
+        
+        ROS_DEBUG("FGMPlanner initialized");
     }
 
     bool FGMPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& plan) {
-        // plan is the global plan to follow, assumes last entry of plan is the goal
         int plan_length = plan.size();
-        int index = std::min(plan_length, 500);
+        int index = std::min(plan_length, sub_goal_idx);
         goal_pose = plan.at(index - 1);
         return true;
     }
 
     bool FGMPlanner::isGoalReached() {
-        if (goalDistance() < 0.5) {
-            ROS_INFO_STREAM("Goal Reached");
+        if (goalDistance() < goal_distance_tolerance) {
+            ROS_DEBUG("Goal Reached");
             Gap lastGap();
             return true;
         } else {
@@ -79,12 +97,11 @@ namespace fgm_plugin
 
     bool FGMPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel) {
         visualization_msgs::MarkerArray vis_arr;
-        // used perfect localization
 
+        // used perfect localization
         double yaw = atan2(2.0 * (current_pose_.orientation.w * current_pose_.orientation.z + current_pose_.orientation.x * current_pose_.orientation.y),
             1.0 - 2.0 * (current_pose_.orientation.y * current_pose_.orientation.y + current_pose_.orientation.z * current_pose_.orientation.z));
         goal_angle = atan2(goal_pose.pose.position.y - current_pose_.position.y, goal_pose.pose.position.x - current_pose_.position.x);
-
 
         yaw = fmod(yaw + 2 * PI, 2 * PI) - PI;
         goal_angle = fmod(goal_angle + 2 * PI, 2 * PI) - PI;
@@ -99,15 +116,18 @@ namespace fgm_plugin
             }
         }
 
-        bool goal_path_clear = checkGoToGoal(goal_angle);
-
-        if (goal_path_clear) {
-            heading = goal_angle;
-            cmd_vel.linear.x = fmin(fabs(0.1 / heading), 0.6);
-            // cmd_vel.linear.x = 0;
-            heading = fmax(fmin(heading, 0.8), -0.8);
-            cmd_vel.angular.z = 0.8 * heading;
-            return true;
+        if (go_to_goal) {
+            bool goal_path_clear = checkGoToGoal(goal_angle);
+            ROS_DEBUG("Goal Path: %s", goal_path_clear? "Clear":"Not Clear");
+            if (goal_path_clear) {
+                heading = goal_angle;
+                cmd_vel.linear.x = fmin(fabs(0.1 / heading), 0.6);
+                // cmd_vel.linear.x = 0;
+                heading = fmax(fmin(heading, 0.8), -0.8);
+                cmd_vel.angular.z = 0.8 * heading;
+                pathVisualization(vis_arr,0,0,0,2);
+                return true;
+            }
         }
 
         std::priority_queue <Gap, std::vector<Gap>, gapComparator> pq;        
@@ -120,12 +140,13 @@ namespace fgm_plugin
         float l_dist = 0;
         float r_dist = 0;
         int size = 0;
-        int start_nan_idx = 144;
+        // start_index = 144;
+        int start_nan_idx = start_index;
         dmin = 10;
 
         // Generating Gaps
         // Limited fov
-        for(std::vector<float>::size_type it = 144; it < stored_scan_msgs.ranges.size() && it < 368; ++it)
+        for(std::vector<float>::size_type it = start_index; it < stored_scan_msgs.ranges.size() && it < 512 - start_index; ++it)
         {
             if (prev) {
                 if (stored_scan_msgs.ranges[it] > 2.9) { // isnan
@@ -159,7 +180,7 @@ namespace fgm_plugin
 
         // Account for error
         if (prev) {
-            Gap placeHolder(start_nan_idx, 368 - 1, size, l_dist, 0, goal_angle);        
+            Gap placeHolder(start_nan_idx, 512 - start_index - 1, size, l_dist, 0, goal_angle);        
             pq.push(placeHolder);
         }
 
@@ -197,21 +218,18 @@ namespace fgm_plugin
             info_pub.publish(angle_data);
         }
 
-        pathVisualization(&vis_arr, gap_angle, 1);
+        heading = (alpha / dmin * gap_angle + goal_angle)/(alpha / dmin + 1);
+        ROS_DEBUG("Dmin= %f", dmin);
 
-        heading = (alpha / dmin * gap_angle + dmin * goal_angle)/(alpha / dmin + dmin);
-        cmd_vel.linear.x = fmin(fabs(0.1 / heading), 0.6);
-        heading = fmax(fmin(heading, 0.8), -0.8);
-        cmd_vel.angular.z = 0.8 * heading;
+        cmd_vel.linear.x = fmin(fabs(0.1 / heading), max_linear_x);
+        heading = fmax(fmin(heading, max_angular_z), -max_angular_z);
+        cmd_vel.angular.z = heading;
+        pathVisualization(vis_arr, goal_angle, gap_angle, heading, 0);
         return true;
     }
 
     FGMPlanner::~FGMPlanner() {
         ROS_INFO_STREAM("Terminated");
-    }
-
-    void reconfigureCb(fgm_plugin::FGMConfig& config, uint32_t level) {
-        ROS_INFO_STREAM(config.scan_height);
     }
 
     bool FGMPlanner::checkGoToGoal(float goal_angle) {
@@ -242,7 +260,7 @@ namespace fgm_plugin
             access_idx = j < 0 ? j += 512 : j;
             dist = stored_scan_msgs.ranges[access_idx];
             min_clearance = dist * cos(i * stored_scan_msgs.angle_increment);
-            if (min_clearance < 0.4) {
+            if (min_clearance < 0.3) {
                 return false;
             }
             i++;
@@ -256,7 +274,7 @@ namespace fgm_plugin
             access_idx = j > 512 ? j -= 512 : j;
             dist = stored_scan_msgs.ranges[access_idx];
             min_clearance = dist * cos(i * stored_scan_msgs.angle_increment);
-            if (min_clearance < 0.4) {
+            if (min_clearance < 0.3) {
                 return false;
             }
             i++;
@@ -272,7 +290,8 @@ namespace fgm_plugin
         return sqrt(pow(goal_pose.pose.position.y - current_pose_.position.y,2) + pow(goal_pose.pose.position.x - current_pose_.position.x,2));
     }
 
-    void FGMPlanner::pathVisualization(visualization_msgs::MarkerArray* vis_arr, float degree, int hash) {
+    void FGMPlanner::pathVisualization(visualization_msgs::MarkerArray vis_arr, float goal_angle, float gap_angle, float heading, int mode) {
+        int hash = 0;
         for (int i = 0; i < 40; i++) {
             visualization_msgs::Marker marker;
             // marker. "/base_link"
@@ -280,9 +299,64 @@ namespace fgm_plugin
             marker.header.stamp = ros::Time();
             marker.id = hash * 100 + i;
             marker.type = visualization_msgs::Marker::SPHERE;
-            marker.action = visualization_msgs::Marker::ADD;
-            marker.pose.position.x = i * 0.05 * cos(degree);
-            marker.pose.position.y = i * 0.05 * sin(degree);
+            marker.action = mode;
+            marker.pose.position.x = i * 0.05 * cos(goal_angle);
+            marker.pose.position.y = i * 0.05 * sin(goal_angle);
+            marker.pose.position.z = 0.5;
+            marker.pose.orientation.x = 0.0;
+            marker.pose.orientation.y = 0.0;
+            marker.pose.orientation.z = 0.0;
+            marker.pose.orientation.w = 1.0;
+            marker.lifetime = ros::Duration(0.2);
+            marker.scale.x = 0.05;
+            marker.scale.y = 0.05;
+            marker.scale.z = 0.05;
+            // marker.lifetime = ros::Duration(0.2);
+            marker.color.a = 1.0; // Don't forget to set the alpha!
+            marker.color.r = 1.0;
+            marker.color.g = 0.0;
+            marker.color.b = 0.0;
+            vis_arr.markers.push_back(marker);
+        }
+
+        hash = 1;
+        for (int i = 0; i < 40; i++) {
+            visualization_msgs::Marker marker;
+            // marker. "/base_link"
+            marker.header.frame_id = "base_link";
+            marker.header.stamp = ros::Time();
+            marker.id = hash * 100 + i;
+            marker.type = visualization_msgs::Marker::SPHERE;
+            marker.action = mode;
+            marker.pose.position.x = i * 0.05 * cos(gap_angle);
+            marker.pose.position.y = i * 0.05 * sin(gap_angle);
+            marker.pose.position.z = 0.5;
+            marker.pose.orientation.x = 0.0;
+            marker.pose.orientation.y = 0.0;
+            marker.pose.orientation.z = 0.0;
+            marker.pose.orientation.w = 1.0;
+            marker.scale.x = 0.05;
+            marker.scale.y = 0.05;
+            marker.scale.z = 0.05;
+            // marker.lifetime = ros::Duration(0.2);
+            marker.color.a = 1.0; // Don't forget to set the alpha!
+            marker.color.r = 0.0;
+            marker.color.g = 1.0;
+            marker.color.b = 0.0;
+            vis_arr.markers.push_back(marker);
+        }
+
+        hash = 2;
+        for (int i = 0; i < 40; i++) {
+            visualization_msgs::Marker marker;
+            // marker. "/base_link"
+            marker.header.frame_id = "base_link";
+            marker.header.stamp = ros::Time();
+            marker.id = hash * 100 + i;
+            marker.type = visualization_msgs::Marker::SPHERE;
+            marker.action = mode;
+            marker.pose.position.x = i * 0.05 * cos(heading);
+            marker.pose.position.y = i * 0.05 * sin(heading);
             marker.pose.position.z = 0.5;
             marker.pose.orientation.x = 0.0;
             marker.pose.orientation.y = 0.0;
@@ -295,16 +369,10 @@ namespace fgm_plugin
             marker.color.a = 1.0; // Don't forget to set the alpha!
             marker.color.r = 0.0;
             marker.color.g = 0.0;
-            marker.color.b = 0.0;
-            if (hash = 0) {
-                marker.color.r = 1.0;
-            } else if (hash == 1) {
-                marker.color.b = 1.0;
-            } else {
-                marker.color.g = 1.0;
-            }
-            vis_pub.publish(marker);
+            marker.color.b = 1.0;
+            vis_arr.markers.push_back(marker);
         }
+        vis_pub.publish(vis_arr);
         return;
     }
 
