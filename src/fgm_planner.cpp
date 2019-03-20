@@ -5,7 +5,6 @@
 #include <string>
 #include <math.h>
 #include <cmath>
-// #include <math>
 #include <sstream>
 #include "std_msgs/String.h"
 #include <stdlib.h>
@@ -27,11 +26,13 @@ namespace fgm_plugin
         ros::Publisher vis_pub;
         ros::Subscriber laser_sub;
         ros::Subscriber pose_sub;
+        ros::Subscriber pose_pub;
         ros::Publisher gap_angle_pub;
         go_to_goal = false;
         gap_switch_counter = 0;
         dynamic_recfg_server = boost::make_shared<dynamic_reconfigure::Server<fgm_plugin::FGMConfig> >(nh);
         Gap lastGap();
+        path_count = 0;
     }
 
     void FGMPlanner::laserScanCallback(const sensor_msgs::LaserScan msg) {
@@ -53,16 +54,18 @@ namespace fgm_plugin
         sub_goal_idx = config.sub_goal_idx;
         goal_distance_tolerance = (float)config.goal_tolerance;
         alpha = (float)config.alpha;
+        score = config.score;
 
         ROS_DEBUG("Reconfigure:\n"
         "Max Linear: %f\n"
         "Max Angular: %f\n"
         "Field of View: %f\n"
         "Go to Goal Behavior: %s\n"
+        "Scoring Function Behavior: %s\n"
         "Subgoal Index: %d\n"
         "Goal Test Tolerance: %f\n"
         "Alpha: %f",max_linear_x,max_angular_z,fov,go_to_goal? "True":"False",
-        sub_goal_idx, goal_distance_tolerance, alpha);
+        score? "True":"False", sub_goal_idx, goal_distance_tolerance, alpha);
         start_index = 256 - fov / 360 * 512 / 2;
     }
 
@@ -71,6 +74,8 @@ namespace fgm_plugin
         vis_pub = nh.advertise<visualization_msgs::MarkerArray>("/viz_array", 3000);
         laser_sub = nh.subscribe("/point_scan", 100, &FGMPlanner::laserScanCallback, this);
         pose_sub = nh.subscribe("/robot_pose",10, &FGMPlanner::poseCallback, this);
+        pose_pub = nh.advertise<geometry_msgs::PoseArray>("/path_array", 3000);
+
 
         f = boost::bind(&FGMPlanner::reconfigureCb, this, _1, _2);
         dynamic_recfg_server->setCallback(f);
@@ -89,13 +94,22 @@ namespace fgm_plugin
         if (goalDistance() < goal_distance_tolerance) {
             ROS_DEBUG("Goal Reached");
             Gap lastGap();
+            traversed_path = geometry_msgs::PoseArray();
             return true;
         } else {
             return false;
         }
     }
 
+    // TODO: Gap hashing and identification
     bool FGMPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel) {
+        path_count ++;
+        path_count %= 5;
+        traversed_path.header.stamp = ros::Time::now();
+        traversed_path.header.frame_id = "map";
+
+        traversed_path.poses.push_back(current_pose_);
+        pose_pub.publish(traversed_path);
         visualization_msgs::MarkerArray vis_arr;
 
         // used perfect localization
@@ -132,7 +146,7 @@ namespace fgm_plugin
 
         std::priority_queue <Gap, std::vector<Gap>, gapComparator> pq;        
         // This is a place holder
-        Gap currLarge(0,0,0,0,0, goal_angle);
+        Gap currLarge(0,0,0,0,0, goal_angle, score);
         gap_angle = 0;
 
         // Compute gaps
@@ -156,7 +170,7 @@ namespace fgm_plugin
                     dmin = fmin(dmin, r_dist);
                     if (size > 10) {
                         // Filter out noise, tho rarely exists
-                        Gap newGap(start_nan_idx, it, size, l_dist, r_dist, goal_angle);
+                        Gap newGap(start_nan_idx, it, size, l_dist, r_dist, goal_angle, score);
                         if (newGap.traversable() == 1) {
                             pq.push(newGap);
                         }
@@ -180,7 +194,7 @@ namespace fgm_plugin
 
         // Account for error
         if (prev) {
-            Gap placeHolder(start_nan_idx, 512 - start_index - 1, size, l_dist, 0, goal_angle);        
+            Gap placeHolder(start_nan_idx, 512 - start_index - 1, size, l_dist, 0, goal_angle, score);        
             pq.push(placeHolder);
         }
 

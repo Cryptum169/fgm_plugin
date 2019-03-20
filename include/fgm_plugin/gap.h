@@ -16,10 +16,11 @@ class Gap
     float gap_score;
     float goal_angle;
     float gap_angle;
+    bool score;
 
   public:
     Gap();
-    Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal);
+    Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal, bool score);
 
     void setGoalAngle(float _goal_angle);
 

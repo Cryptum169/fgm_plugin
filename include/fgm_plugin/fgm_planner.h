@@ -17,6 +17,7 @@
 #include <vector>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <geometry_msgs/PoseArray.h>
 #include <dynamic_reconfigure/server.h>
 #include <fgm_plugin/FGMConfig.h>
 
@@ -98,6 +99,7 @@ namespace fgm_plugin {
         ros::Publisher vis_pub;
         ros::Subscriber laser_sub;
         ros::Subscriber pose_sub;
+        ros::Publisher pose_pub;
 
         Gap lastGap;
 
@@ -111,9 +113,12 @@ namespace fgm_plugin {
         // boost::shared_ptr<nav_msgs::Odometry const> sharedPtr_pose;
         // costmap_2d::Costmap2DROS* costmap_ros_;
         tf::Stamped<tf::Pose> current_pose_2;
+        geometry_msgs::PoseArray traversed_path;
+        int path_count;
 
         boost::shared_ptr<dynamic_reconfigure::Server<fgm_plugin::FGMConfig> > dynamic_recfg_server;
         dynamic_reconfigure::Server<fgm_plugin::FGMConfig>::CallbackType f;
+
 
         // Reconfigurable Parameters
         float max_linear_x;
@@ -122,6 +127,7 @@ namespace fgm_plugin {
         bool go_to_goal;
         int sub_goal_idx;
         float goal_distance_tolerance;
+        bool score;
   };
 };
 #endif

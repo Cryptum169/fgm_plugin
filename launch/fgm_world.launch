@@ -28,9 +28,9 @@
   
   <!-- Fake laser -->
     <node pkg="nodelet" type="nodelet" name="laserscan_nodelet_manager" args="manager"  required="true"/>
-    <node pkg="nodelet" type="nodelet" name="depthimage_to_laserscan"
-          args="load depthimage_to_laserscan/DepthImageToLaserScanNodelet laserscan_nodelet_manager"  required="true" output="screen">
-      <param name="scan_height" value="10"/>
+    <node pkg="nodelet" type="nodelet" name="full_depthimage_to_laserscan"
+          args="load full_depthimage_to_laserscan/DepthImageToLaserScanNodelet laserscan_nodelet_manager"  required="true" output="screen">
+      <param name="scan_height" value="5"/>
       <param name="output_frame_id" value="camera_depth_frame"/>
       <param name="range_min" value="0.45"/>
       <param name="approach" value="0"/>
