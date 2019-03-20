@@ -10,7 +10,7 @@ Gap::Gap() {
     gap_angle = -3.1415926;
 }
 
-Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal)
+Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal, bool score)
     {
         start_angle = _start;
         end_angle = _end;
@@ -19,6 +19,7 @@ Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal
         size = _size;
         goal_angle = goal;
         gap_angle = this->getAngle();
+        score = score;
     }
 
     void Gap::setGoalAngle(float _goal_angle) {
@@ -34,15 +35,13 @@ Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal
         angle_increment = 0.0122718466446;
         angle_min = -3.14159274101; // Returned by sensor message
         float gap_dir = (start_angle + end_angle) / 2 * angle_increment + angle_min;
-        // Very little actual performance issue in finding center of observed gap and actual gap
-        // For computation performance, went with observed gap here
         return gap_dir;
     }
 
     float Gap::getScore() const {
         float val = goal_angle - gap_angle;
         val = val > 0 ? fmod(val + 2 * PI, 2 * PI) : fmod(val - 2 * PI, 2 * PI);
-        return fabs(val);
+        return score ? fabs(val) : 0 - size;
     }
 
     float Gap::traversable() {
