@@ -17,6 +17,7 @@ class Gap
     float goal_angle;
     float gap_angle;
     bool score;
+    float _robot_ori;
 
   public:
     Gap();
@@ -32,6 +33,9 @@ class Gap
     float traversable();
 
     int getSize() const;
+
+    void recordOdom(float robot_orientation);
+    float getOdom();
 };
 #else
 #endif

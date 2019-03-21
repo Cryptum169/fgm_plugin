@@ -189,7 +189,7 @@ namespace fgm_plugin
                     dmin = fmin(dmin, l_dist);
                 }
             }
-            // Populate obstacle here
+            // Populate obstacle heredmin
         }
 
         // Account for error
@@ -198,26 +198,31 @@ namespace fgm_plugin
             pq.push(placeHolder);
         }
 
+        float minD;
+        minD = *std::min_element(stored_scan_msgs.ranges.begin(), stored_scan_msgs.ranges.end());
+
         // Calculate gap angle
         // Do Sticky gap implementation
         // NOT STICKY YET
         if (pq.size() != 0) {
             currLarge = pq.top();
-            if (currLarge.getScore() < lastGap.getScore() / 1.5 && lastGap.getScore() > 0.1) {
-                gap_angle = currLarge.getAngle();
-                gap_switch_counter = 0;
+            if (currLarge.getScore() < (lastGap.getScore() / 1.5) && lastGap.getScore() > 0.1) {
                 lastGap = currLarge;
+                gap_switch_counter = 0;
+                lastGap.recordOdom(yaw);
+                gap_angle = currLarge.getAngle();
             } else {
                 if (gap_switch_counter < 3) {
-                    gap_angle = lastGap.getAngle();
-                    gap_switch_counter = 0;
+                    gap_angle = lastGap.getAngle() - lastGap.getOdom() + yaw;
+                    gap_switch_counter ++;
                 } else {
-                    gap_angle = currLarge.getAngle();
-                    gap_switch_counter = 0;
                     lastGap = currLarge;
+                    gap_switch_counter = 0;
+                    lastGap.recordOdom(yaw);
+                    gap_angle = currLarge.getAngle();
                 }
             }
-            gap_angle = currLarge.getAngle();
+            // gap_angle = currLarge.getAngle();
         } else {
             ROS_DEBUG_STREAM("No Traversable gap found");
             // POTENTIAL HAZARD
@@ -235,7 +240,7 @@ namespace fgm_plugin
         heading = (alpha / dmin * gap_angle + goal_angle)/(alpha / dmin + 1);
         ROS_DEBUG("Dmin= %f", dmin);
 
-        cmd_vel.linear.x = fmin(fabs(0.1 / heading), max_linear_x);
+        cmd_vel.linear.x = fmin(fabs(0.1 / heading), max_linear_x) * minD;
         heading = fmax(fmin(heading, max_angular_z), -max_angular_z);
         cmd_vel.angular.z = heading;
         pathVisualization(vis_arr, goal_angle, gap_angle, heading, 0);

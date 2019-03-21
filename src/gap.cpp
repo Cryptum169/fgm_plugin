@@ -56,3 +56,11 @@ Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal
     }
 
     int Gap::getSize() const { return size; }
+
+    void Gap::recordOdom(float robot_orientation) {
+        _robot_ori = robot_orientation;
+    }
+    
+    float Gap::getOdom() {
+        return _robot_ori;
+    }
