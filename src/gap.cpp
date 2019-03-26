@@ -8,6 +8,7 @@ Gap::Gap() {
     // place holder to return worst scenario
     goal_angle = 0;
     gap_angle = -3.1415926;
+    score = false;
 }
 
 Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal, bool score)

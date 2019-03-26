@@ -21,7 +21,7 @@ PLUGINLIB_EXPORT_CLASS(fgm_plugin::FGMPlanner, nav_core::BaseLocalPlanner)
 namespace fgm_plugin
 {
     FGMPlanner::FGMPlanner() {
-        ros::NodeHandle nh("~/fgm_planner_node");
+        ros::NodeHandle nh("~fgm_planner_node");
         ros::Publisher info_pub;
         ros::Publisher vis_pub;
         ros::Subscriber laser_sub;
@@ -55,6 +55,7 @@ namespace fgm_plugin
         goal_distance_tolerance = (float)config.goal_tolerance;
         alpha = (float)config.alpha;
         score = config.score;
+        sticky = config.sticky;
 
         ROS_DEBUG("Reconfigure:\n"
         "Max Linear: %f\n"
@@ -206,23 +207,26 @@ namespace fgm_plugin
         // NOT STICKY YET
         if (pq.size() != 0) {
             currLarge = pq.top();
-            if (currLarge.getScore() < (lastGap.getScore() / 1.5) && lastGap.getScore() > 0.1) {
-                lastGap = currLarge;
-                gap_switch_counter = 0;
-                lastGap.recordOdom(yaw);
-                gap_angle = currLarge.getAngle();
-            } else {
-                if (gap_switch_counter < 3) {
-                    gap_angle = lastGap.getAngle() - lastGap.getOdom() + yaw;
-                    gap_switch_counter ++;
-                } else {
+            if (sticky) {
+                if (currLarge.getScore() < (lastGap.getScore() / 1.5) && lastGap.getScore() > 0.1) {
                     lastGap = currLarge;
                     gap_switch_counter = 0;
                     lastGap.recordOdom(yaw);
                     gap_angle = currLarge.getAngle();
+                } else {
+                    if (gap_switch_counter < 3) {
+                        gap_angle = lastGap.getAngle() - lastGap.getOdom() + yaw;
+                        gap_switch_counter ++;
+                    } else {
+                        lastGap = currLarge;
+                        gap_switch_counter = 0;
+                        lastGap.recordOdom(yaw);
+                        gap_angle = currLarge.getAngle();
+                    }
                 }
+            } else {
+                gap_angle = currLarge.getAngle();
             }
-            // gap_angle = currLarge.getAngle();
         } else {
             ROS_DEBUG_STREAM("No Traversable gap found");
             // POTENTIAL HAZARD

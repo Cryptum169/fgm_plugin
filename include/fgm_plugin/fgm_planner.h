@@ -128,6 +128,7 @@ namespace fgm_plugin {
         int sub_goal_idx;
         float goal_distance_tolerance;
         bool score;
+        bool sticky;
   };
 };
 #endif
