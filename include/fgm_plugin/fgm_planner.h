@@ -115,6 +115,7 @@ namespace fgm_plugin {
         tf::Stamped<tf::Pose> current_pose_2;
         geometry_msgs::PoseArray traversed_path;
         int path_count;
+        bool temp;
 
         boost::shared_ptr<dynamic_reconfigure::Server<fgm_plugin::FGMConfig> > dynamic_recfg_server;
         dynamic_reconfigure::Server<fgm_plugin::FGMConfig>::CallbackType f;

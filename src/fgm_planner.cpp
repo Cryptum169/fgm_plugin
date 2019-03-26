@@ -33,11 +33,13 @@ namespace fgm_plugin
         dynamic_recfg_server = boost::make_shared<dynamic_reconfigure::Server<fgm_plugin::FGMConfig> >(nh);
         Gap lastGap();
         path_count = 0;
+        temp = false;
     }
 
     void FGMPlanner::laserScanCallback(const sensor_msgs::LaserScan msg) {
         // Store local san message
         stored_scan_msgs = msg;
+        temp = true;
     }
 
     void FGMPlanner::poseCallback(const geometry_msgs::Pose msg) {
@@ -77,7 +79,6 @@ namespace fgm_plugin
         pose_sub = nh.subscribe("/robot_pose",10, &FGMPlanner::poseCallback, this);
         pose_pub = nh.advertise<geometry_msgs::PoseArray>("/path_array", 3000);
 
-
         f = boost::bind(&FGMPlanner::reconfigureCb, this, _1, _2);
         dynamic_recfg_server->setCallback(f);
         
@@ -108,6 +109,13 @@ namespace fgm_plugin
         path_count %= 5;
         traversed_path.header.stamp = ros::Time::now();
         traversed_path.header.frame_id = "map";
+
+        if(!temp) {
+            ROS_INFO_STREAM("no scan message");
+            cmd_vel.linear.x = 0;
+            cmd_vel.angular.z = 0;
+            return false;
+        }
 
         traversed_path.poses.push_back(current_pose_);
         pose_pub.publish(traversed_path);
@@ -214,7 +222,7 @@ namespace fgm_plugin
                     lastGap.recordOdom(yaw);
                     gap_angle = currLarge.getAngle();
                 } else {
-                    if (gap_switch_counter < 3) {
+                    if (gap_switch_counter < 2) {
                         gap_angle = lastGap.getAngle() - lastGap.getOdom() + yaw;
                         gap_switch_counter ++;
                     } else {
@@ -258,8 +266,8 @@ namespace fgm_plugin
     bool FGMPlanner::checkGoToGoal(float goal_angle) {
         // Or traversable gap
         int goalIdx = angleToSensorIdx(goal_angle);
-        int goal_left_idx = angleToSensorIdx(goal_angle - asin(0.25/3));
-        int goal_right_idx = angleToSensorIdx(goal_angle + asin(0.25/3));
+        int goal_left_idx = angleToSensorIdx(goal_angle - asin(0.5/3));
+        int goal_right_idx = angleToSensorIdx(goal_angle + asin(0.5/3));
         int access_idx = 0;
 
         for (int j = goal_left_idx; j < goal_right_idx; ++j) {
@@ -297,7 +305,7 @@ namespace fgm_plugin
             access_idx = j > 512 ? j -= 512 : j;
             dist = stored_scan_msgs.ranges[access_idx];
             min_clearance = dist * cos(i * stored_scan_msgs.angle_increment);
-            if (min_clearance < 0.3) {
+            if (min_clearance < 0.5) {
                 return false;
             }
             i++;
