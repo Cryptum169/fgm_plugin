@@ -21,7 +21,7 @@ PLUGINLIB_EXPORT_CLASS(fgm_plugin::FGMPlanner, nav_core::BaseLocalPlanner)
 namespace fgm_plugin
 {
     FGMPlanner::FGMPlanner() {
-        ros::NodeHandle nh("~/fgm_planner_node");
+        ros::NodeHandle nh("~fgm_planner_node");
         ros::Publisher info_pub;
         ros::Publisher vis_pub;
         ros::Subscriber laser_sub;
@@ -33,16 +33,18 @@ namespace fgm_plugin
         dynamic_recfg_server = boost::make_shared<dynamic_reconfigure::Server<fgm_plugin::FGMConfig> >(nh);
         Gap lastGap();
         path_count = 0;
+        temp = false;
     }
 
-    void FGMPlanner::laserScanCallback(const sensor_msgs::LaserScan msg) {
+    void FGMPlanner::laserScanCallback(boost::shared_ptr<sensor_msgs::LaserScan const> msg) {
         // Store local san message
-        stored_scan_msgs = msg;
+        sharedPtr_laser = msg;
+        temp = true;
     }
 
-    void FGMPlanner::poseCallback(const geometry_msgs::Pose msg) {
+    void FGMPlanner::poseCallback(boost::shared_ptr<geometry_msgs::Pose const> msg) {
         // Robot Pose message
-        current_pose_ = msg;
+        sharedPtr_pose = msg;
     }
 
     void FGMPlanner::reconfigureCb(fgm_plugin::FGMConfig& config, uint32_t level) {
@@ -55,6 +57,7 @@ namespace fgm_plugin
         goal_distance_tolerance = (float)config.goal_tolerance;
         alpha = (float)config.alpha;
         score = config.score;
+        sticky = config.sticky;
 
         ROS_DEBUG("Reconfigure:\n"
         "Max Linear: %f\n"
@@ -75,7 +78,6 @@ namespace fgm_plugin
         laser_sub = nh.subscribe("/point_scan", 100, &FGMPlanner::laserScanCallback, this);
         pose_sub = nh.subscribe("/robot_pose",10, &FGMPlanner::poseCallback, this);
         pose_pub = nh.advertise<geometry_msgs::PoseArray>("/path_array", 3000);
-
 
         f = boost::bind(&FGMPlanner::reconfigureCb, this, _1, _2);
         dynamic_recfg_server->setCallback(f);
@@ -108,10 +110,19 @@ namespace fgm_plugin
         traversed_path.header.stamp = ros::Time::now();
         traversed_path.header.frame_id = "map";
 
+        if(!temp) {
+            ROS_INFO_STREAM("no scan message");
+            cmd_vel.linear.x = 0;
+            cmd_vel.angular.z = 0;
+            return false;
+        }
+
         traversed_path.poses.push_back(current_pose_);
         pose_pub.publish(traversed_path);
         visualization_msgs::MarkerArray vis_arr;
 
+        stored_scan_msgs = *sharedPtr_laser.get();
+        current_pose_ = *sharedPtr_pose.get();
         // used perfect localization
         double yaw = atan2(2.0 * (current_pose_.orientation.w * current_pose_.orientation.z + current_pose_.orientation.x * current_pose_.orientation.y),
             1.0 - 2.0 * (current_pose_.orientation.y * current_pose_.orientation.y + current_pose_.orientation.z * current_pose_.orientation.z));
@@ -189,7 +200,7 @@ namespace fgm_plugin
                     dmin = fmin(dmin, l_dist);
                 }
             }
-            // Populate obstacle here
+            // Populate obstacle heredmin
         }
 
         // Account for error
@@ -198,26 +209,34 @@ namespace fgm_plugin
             pq.push(placeHolder);
         }
 
+        float minD;
+        minD = *std::min_element(stored_scan_msgs.ranges.begin(), stored_scan_msgs.ranges.end());
+
         // Calculate gap angle
         // Do Sticky gap implementation
         // NOT STICKY YET
         if (pq.size() != 0) {
             currLarge = pq.top();
-            if (currLarge.getScore() < lastGap.getScore() / 1.5 && lastGap.getScore() > 0.1) {
-                gap_angle = currLarge.getAngle();
-                gap_switch_counter = 0;
-                lastGap = currLarge;
-            } else {
-                if (gap_switch_counter < 3) {
-                    gap_angle = lastGap.getAngle();
-                    gap_switch_counter = 0;
-                } else {
-                    gap_angle = currLarge.getAngle();
-                    gap_switch_counter = 0;
+            if (sticky) {
+                if (currLarge.getScore() < (lastGap.getScore() / 1.5) && lastGap.getScore() > 0.1) {
                     lastGap = currLarge;
+                    gap_switch_counter = 0;
+                    lastGap.recordOdom(yaw);
+                    gap_angle = currLarge.getAngle();
+                } else {
+                    if (gap_switch_counter < 2) {
+                        gap_angle = lastGap.getAngle() - lastGap.getOdom() + yaw;
+                        gap_switch_counter ++;
+                    } else {
+                        lastGap = currLarge;
+                        gap_switch_counter = 0;
+                        lastGap.recordOdom(yaw);
+                        gap_angle = currLarge.getAngle();
+                    }
                 }
+            } else {
+                gap_angle = currLarge.getAngle();
             }
-            gap_angle = currLarge.getAngle();
         } else {
             ROS_DEBUG_STREAM("No Traversable gap found");
             // POTENTIAL HAZARD
@@ -235,7 +254,7 @@ namespace fgm_plugin
         heading = (alpha / dmin * gap_angle + goal_angle)/(alpha / dmin + 1);
         ROS_DEBUG("Dmin= %f", dmin);
 
-        cmd_vel.linear.x = fmin(fabs(0.1 / heading), max_linear_x);
+        cmd_vel.linear.x = fmin(fabs(0.1 / heading), max_linear_x) * minD;
         heading = fmax(fmin(heading, max_angular_z), -max_angular_z);
         cmd_vel.angular.z = heading;
         pathVisualization(vis_arr, goal_angle, gap_angle, heading, 0);
@@ -249,8 +268,8 @@ namespace fgm_plugin
     bool FGMPlanner::checkGoToGoal(float goal_angle) {
         // Or traversable gap
         int goalIdx = angleToSensorIdx(goal_angle);
-        int goal_left_idx = angleToSensorIdx(goal_angle - asin(0.25/3));
-        int goal_right_idx = angleToSensorIdx(goal_angle + asin(0.25/3));
+        int goal_left_idx = angleToSensorIdx(goal_angle - asin(0.5/3));
+        int goal_right_idx = angleToSensorIdx(goal_angle + asin(0.5/3));
         int access_idx = 0;
 
         for (int j = goal_left_idx; j < goal_right_idx; ++j) {
@@ -288,7 +307,7 @@ namespace fgm_plugin
             access_idx = j > 512 ? j -= 512 : j;
             dist = stored_scan_msgs.ranges[access_idx];
             min_clearance = dist * cos(i * stored_scan_msgs.angle_increment);
-            if (min_clearance < 0.3) {
+            if (min_clearance < 0.5) {
                 return false;
             }
             i++;

@@ -8,6 +8,7 @@ Gap::Gap() {
     // place holder to return worst scenario
     goal_angle = 0;
     gap_angle = -3.1415926;
+    score = false;
 }
 
 Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal, bool score)
@@ -40,7 +41,7 @@ Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal
 
     float Gap::getScore() const {
         float val = goal_angle - gap_angle;
-        val = val > 0 ? fmod(val + 2 * PI, 2 * PI) : fmod(val - 2 * PI, 2 * PI);
+        val = val > 0 ? fmod(val + 2 * PI, 2 * PI) - PI: fmod(val - 2 * PI, 2 * PI) - PI;
         return score ? fabs(val) : 0 - size;
     }
 
@@ -48,7 +49,7 @@ Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal
         float dist = fmin(left_dist, right_dist);
         float clearance = 2 * dist * sin((end_angle - start_angle) * angle_increment / 2);
         // TODO: Set for rectangular path
-        if (clearance > 0.3) {
+        if (clearance > 0.4) {
             return 1;
         } else {
             return 0;
@@ -56,3 +57,11 @@ Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal
     }
 
     int Gap::getSize() const { return size; }
+
+    void Gap::recordOdom(float robot_orientation) {
+        _robot_ori = robot_orientation;
+    }
+    
+    float Gap::getOdom() {
+        return _robot_ori;
+    }
