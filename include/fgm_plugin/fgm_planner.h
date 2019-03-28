@@ -65,13 +65,15 @@ namespace fgm_plugin {
          * @brief  Constructs the local planner
          * @param name The name to give this instance of the local planner
          * @param tf A pointer to a transform listener
-         * @param costmap_ros The cost map to use for assigning costs to local plans
+         * @param costmap_ros The` cost map to use for assigning costs to local plans
          */
         void initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros);
 
         // Callback functions
-        void laserScanCallback(const sensor_msgs::LaserScan msg);
-        void poseCallback(const geometry_msgs::Pose msg);
+        // void laserScanCallback(const sensor_msgs::LaserScan msg);
+        void laserScanCallback(boost::shared_ptr<sensor_msgs::LaserScan const>);
+        // void poseCallback(const geometry_msgs::Pose msg);
+        void poseCallback(boost::shared_ptr<geometry_msgs::Pose const>);
         void reconfigureCb(fgm_plugin::FGMConfig& config, uint32_t level);
 
         // Utility functions

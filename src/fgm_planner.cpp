@@ -36,15 +36,15 @@ namespace fgm_plugin
         temp = false;
     }
 
-    void FGMPlanner::laserScanCallback(const sensor_msgs::LaserScan msg) {
+    void FGMPlanner::laserScanCallback(boost::shared_ptr<sensor_msgs::LaserScan const> msg) {
         // Store local san message
-        stored_scan_msgs = msg;
+        sharedPtr_laser = msg;
         temp = true;
     }
 
-    void FGMPlanner::poseCallback(const geometry_msgs::Pose msg) {
+    void FGMPlanner::poseCallback(boost::shared_ptr<geometry_msgs::Pose const> msg) {
         // Robot Pose message
-        current_pose_ = msg;
+        sharedPtr_pose = msg;
     }
 
     void FGMPlanner::reconfigureCb(fgm_plugin::FGMConfig& config, uint32_t level) {
@@ -121,6 +121,8 @@ namespace fgm_plugin
         pose_pub.publish(traversed_path);
         visualization_msgs::MarkerArray vis_arr;
 
+        stored_scan_msgs = *sharedPtr_laser.get();
+        current_pose_ = *sharedPtr_pose.get();
         // used perfect localization
         double yaw = atan2(2.0 * (current_pose_.orientation.w * current_pose_.orientation.z + current_pose_.orientation.x * current_pose_.orientation.y),
             1.0 - 2.0 * (current_pose_.orientation.y * current_pose_.orientation.y + current_pose_.orientation.z * current_pose_.orientation.z));
