@@ -21,6 +21,9 @@
 #include <dynamic_reconfigure/server.h>
 #include <fgm_plugin/FGMConfig.h>
 
+// Using a global planner
+#include <navfn/navfn_ros.h>
+
 namespace fgm_plugin {
   /**
    * @class DWAPlanner
@@ -106,6 +109,8 @@ namespace fgm_plugin {
         Gap lastGap;
 
         geometry_msgs::PoseStamped goal_pose;
+
+        geometry_msgs::PoseStamped plan_curr_pose;
         geometry_msgs::Pose current_pose_;
         costmap_2d::Costmap2DROS* costmap_ros_;
         boost::shared_ptr<sensor_msgs::LaserScan const> sharedPtr_laser;
@@ -118,10 +123,14 @@ namespace fgm_plugin {
         geometry_msgs::PoseArray traversed_path;
         int path_count;
         bool temp;
+        bool global_cmap_flag;
 
         boost::shared_ptr<dynamic_reconfigure::Server<fgm_plugin::FGMConfig> > dynamic_recfg_server;
         dynamic_reconfigure::Server<fgm_plugin::FGMConfig>::CallbackType f;
 
+        // navFn
+        std::vector<geometry_msgs::PoseStamped> test_plan;
+        navfn::NavfnROS navfn;
 
         // Reconfigurable Parameters
         float max_linear_x;

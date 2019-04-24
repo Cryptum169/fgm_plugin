@@ -34,6 +34,7 @@ namespace fgm_plugin
         Gap lastGap();
         path_count = 0;
         temp = false;
+        global_cmap_flag = false;
     }
 
     void FGMPlanner::laserScanCallback(boost::shared_ptr<sensor_msgs::LaserScan const> msg) {
@@ -46,6 +47,10 @@ namespace fgm_plugin
         // Robot Pose message
         sharedPtr_pose = msg;
     }
+
+    // void FGMPlanner::globalcmapCallback(boost::shared_ptr< const> msg) {
+    //     global_cmap_flag = true;
+    // }
 
     void FGMPlanner::reconfigureCb(fgm_plugin::FGMConfig& config, uint32_t level) {
         // Reconfigure Parameter
@@ -75,13 +80,18 @@ namespace fgm_plugin
     void FGMPlanner::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros) {
         info_pub = nh.advertise<std_msgs::String>("planner_info", 100);
         vis_pub = nh.advertise<visualization_msgs::MarkerArray>("/viz_array", 3000);
+        // global_costmap_sub = nh.subscribe("/move_base/global_costmap/costmap", 5, &FGMPlanner::globalcmapCallback, this);
         laser_sub = nh.subscribe("/point_scan", 100, &FGMPlanner::laserScanCallback, this);
         pose_sub = nh.subscribe("/robot_pose",10, &FGMPlanner::poseCallback, this);
         pose_pub = nh.advertise<geometry_msgs::PoseArray>("/path_array", 3000);
 
         f = boost::bind(&FGMPlanner::reconfigureCb, this, _1, _2);
         dynamic_recfg_server->setCallback(f);
-        
+
+        std::string navfv_planner_name = "my_navfn_planner";
+
+        navfn.initialize(navfv_planner_name, costmap_ros);
+
         ROS_DEBUG("FGMPlanner initialized");
     }
 
@@ -89,6 +99,7 @@ namespace fgm_plugin
         int plan_length = plan.size();
         int index = std::min(plan_length, sub_goal_idx);
         goal_pose = plan.at(index - 1);
+        plan_curr_pose = plan.at(0);
         return true;
     }
 
@@ -105,6 +116,18 @@ namespace fgm_plugin
 
     // TODO: Gap hashing and identification
     bool FGMPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel) {
+
+        // navfn.makePlan(plan_curr_pose, goal_pose, test_plan);
+        geometry_msgs::Point tp;
+        tp.x = plan_curr_pose.pose.position.x;
+        tp.y = plan_curr_pose.pose.position.y;
+        tp.z = 0;
+        navfn.computePotential(tp);
+        tp.x += 0.1;
+        tp.y += 0.1;
+
+        ROS_INFO_STREAM(navfn.getPointPotential(tp));
+
         path_count ++;
         path_count %= 5;
         traversed_path.header.stamp = ros::Time::now();
