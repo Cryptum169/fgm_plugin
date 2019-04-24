@@ -80,7 +80,7 @@ void laserCallback(const sensor_msgs::LaserScan& msg) {
     int max_status = 0;
     for(std::vector<float>::size_type it = 0; it < stored_scan_msgs.ranges.size(); ++it)
     {
-        this_state = isnan(stored_scan_msgs.ranges[it]) ? 1 : -1;
+        this_state = stored_scan_msgs.ranges[it] == stored_scan_msgs.ranges[it] ? 1 : -1;
 
         change = this_state - past_state[it];
         if (change != 0) {

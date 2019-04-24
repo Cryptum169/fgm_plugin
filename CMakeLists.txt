@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.3)
 project(fgm_plugin)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++11)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -16,11 +16,20 @@ find_package(catkin REQUIRED COMPONENTS
   gazebo_fake_localization
   dynamic_reconfigure
   nav_msgs
+  std_msgs
+  tf
+  pips_trajectory_msgs
+  pips_msgs
+  trajectory_generator
+  turtlebot_trajectory_generator
 )
 
 generate_dynamic_reconfigure_options(
      cfg/FGMPlanner.cfg
 )
+
+# find_package(Boost REQUIRED COMPONENTS system)
+# find_package(Eigen3 REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -112,11 +121,11 @@ generate_dynamic_reconfigure_options(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
+ INCLUDE_DIRS include
 #  LIBRARIES fgm_plugin
 #  CATKIN_DEPENDS pluginlib roscpp
 #  DEPENDS system_lib
-  CATKIN_DEPENDS dynamic_reconfigure roscpp sensor_msgs
+  CATKIN_DEPENDS dynamic_reconfigure roscpp sensor_msgs geometry_msgs nav_msgs pips_trajectory_msgs trajectory_generator
 )
 
 ###########
@@ -133,6 +142,7 @@ add_library(fgm_plugin src/fgm_planner.cpp src/gap.cpp)
 add_dependencies(fgm_plugin ${PROJECT_NAME}_gencfg)
 add_executable(ground_truth_odom src/ground_truth.cpp)
 add_executable(level_gap src/level_gap.cpp)
+add_executable(traj_tester src/trajectory_tester.cpp)
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/fgm_plugin.cpp
@@ -142,6 +152,8 @@ add_executable(level_gap src/level_gap.cpp)
 target_link_libraries(fgm_plugin ${catkin_LIBRARIES})
 target_link_libraries(ground_truth_odom ${catkin_LIBRARIES})
 target_link_libraries(level_gap ${catkin_LIBRARIES})
+target_link_libraries(traj_tester ${catkin_LIBRARIES} ${EIGEN3_LIBS})
+
 # target_link_libraries(plugin_quiz ${catkin_LIBRARIES} dwa_local_planner)
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
