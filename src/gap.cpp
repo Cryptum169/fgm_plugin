@@ -11,7 +11,7 @@ Gap::Gap() {
     score = false;
 }
 
-Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal, bool score)
+Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal, bool score, double map_score)
     {
         start_angle = _start;
         end_angle = _end;
@@ -21,6 +21,7 @@ Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal
         goal_angle = goal;
         gap_angle = this->getAngle();
         score = score;
+        _map_score = map_score;
     }
 
     void Gap::setGoalAngle(float _goal_angle) {
@@ -41,8 +42,16 @@ Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal
 
     float Gap::getScore() const {
         float val = goal_angle - gap_angle;
-        val = val > 0 ? fmod(val + 2 * PI, 2 * PI) - PI: fmod(val - 2 * PI, 2 * PI) - PI;
+        if (val > PI) {
+            val -= 2 * PI;
+        }
+
+        if (val < -PI) {
+            val += 2 * PI;
+        }
+        // val = val > 0 ? fmod(val + 2 * PI, 2 * PI) - PI: fmod(val - 2 * PI, 2 * PI) - PI;
         return score ? fabs(val) : 0 - size;
+        // return - _map_score;
     }
 
     float Gap::traversable() {
@@ -64,4 +73,8 @@ Gap::Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal
     
     float Gap::getOdom() {
         return _robot_ori;
+    }
+
+    void Gap::setScore(double map_score) {
+        _map_score = map_score;
     }

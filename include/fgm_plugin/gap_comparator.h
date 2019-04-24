@@ -4,6 +4,6 @@ class gapComparator
   public:
     int operator()(const Gap &g1, const Gap &g2)
     {
-        return g1.getScore() > g2.getScore();
+        return g2.getScore() < g1.getScore();
     }
 };

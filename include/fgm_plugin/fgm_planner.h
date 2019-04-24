@@ -105,6 +105,7 @@ namespace fgm_plugin {
         ros::Subscriber laser_sub;
         ros::Subscriber pose_sub;
         ros::Publisher pose_pub;
+        ros::Publisher gap_target;
 
         Gap lastGap;
 

@@ -80,6 +80,8 @@ namespace fgm_plugin
     void FGMPlanner::initialize(std::string name, tf::TransformListener* tf, costmap_2d::Costmap2DROS* costmap_ros) {
         info_pub = nh.advertise<std_msgs::String>("planner_info", 100);
         vis_pub = nh.advertise<visualization_msgs::MarkerArray>("/viz_array", 3000);
+        gap_target = nh.advertise<visualization_msgs::MarkerArray>("/gaps", 3000);
+
         // global_costmap_sub = nh.subscribe("/move_base/global_costmap/costmap", 5, &FGMPlanner::globalcmapCallback, this);
         laser_sub = nh.subscribe("/point_scan", 100, &FGMPlanner::laserScanCallback, this);
         pose_sub = nh.subscribe("/robot_pose",10, &FGMPlanner::poseCallback, this);
@@ -116,17 +118,14 @@ namespace fgm_plugin
 
     // TODO: Gap hashing and identification
     bool FGMPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel) {
-
-        // navfn.makePlan(plan_curr_pose, goal_pose, test_plan);
         geometry_msgs::Point tp;
-        tp.x = plan_curr_pose.pose.position.x;
-        tp.y = plan_curr_pose.pose.position.y;
+        tp.x = 5 + goal_pose.pose.position.x - current_pose_.position.x;
+        tp.y = 5 + goal_pose.pose.position.y - current_pose_.position.y;
+        // tp.x = 5;
+        // tp.y = 5;
         tp.z = 0;
-        navfn.computePotential(tp);
-        tp.x += 0.1;
-        tp.y += 0.1;
-
-        ROS_INFO_STREAM(navfn.getPointPotential(tp));
+        ROS_INFO_STREAM(navfn.computePotential(tp));
+        // Robot is always centered in the cost map and therefore will always be 5,5
 
         path_count ++;
         path_count %= 5;
@@ -143,6 +142,7 @@ namespace fgm_plugin
         traversed_path.poses.push_back(current_pose_);
         pose_pub.publish(traversed_path);
         visualization_msgs::MarkerArray vis_arr;
+        visualization_msgs::MarkerArray gap_selection;
 
         stored_scan_msgs = *sharedPtr_laser.get();
         current_pose_ = *sharedPtr_pose.get();
@@ -180,7 +180,7 @@ namespace fgm_plugin
 
         std::priority_queue <Gap, std::vector<Gap>, gapComparator> pq;        
         // This is a place holder
-        Gap currLarge(0,0,0,0,0, goal_angle, score);
+        Gap currLarge(0,0,0,0,0, goal_angle, score, 0);
         gap_angle = 0;
 
         // Compute gaps
@@ -188,12 +188,20 @@ namespace fgm_plugin
         float l_dist = 0;
         float r_dist = 0;
         int size = 0;
-        // start_index = 144;
         int start_nan_idx = start_index;
         dmin = 10;
 
+        float gap_x;
+        float gap_y;
+
+        float alter_dmin = 0;
+        float alter_min = 10;
+
+        geometry_msgs::Point tp_2;
+
         // Generating Gaps
         // Limited fov
+        int id = 0;
         for(std::vector<float>::size_type it = start_index; it < stored_scan_msgs.ranges.size() && it < 512 - start_index; ++it)
         {
             if (prev) {
@@ -202,13 +210,52 @@ namespace fgm_plugin
                 } else {
                     r_dist = stored_scan_msgs.ranges[it];
                     dmin = fmin(dmin, r_dist);
+                    alter_dmin = (alter_dmin + r_dist) / 2;
+                    alter_min = fmin(alter_dmin, alter_min);
                     if (size > 10) {
                         // Filter out noise, tho rarely exists
-                        Gap newGap(start_nan_idx, it, size, l_dist, r_dist, goal_angle, score);
+                        Gap newGap(start_nan_idx, it, size, l_dist, r_dist, goal_angle, score, 0);
+                        tp_2.x = 5 - alter_min * cos(newGap.getAngle() + yaw);
+                        tp_2.y = 5 - alter_min * sin(newGap.getAngle() + yaw);
+                        tp_2.z = 0;
+                        double value = navfn.getPointPotential(tp_2);
+                        newGap.setScore(value);
                         if (newGap.traversable() == 1) {
                             pq.push(newGap);
                         }
+
+
+                        {
+                            // tp_2.x = 5 - alter_min * cos(newGap.getAngle() + yaw);
+                            // tp_2.y = 5 - alter_min * sin(newGap.getAngle() + yaw);
+                            // tp_2.z = 0;
+                            // double value = navfn.getPointPotential(tp_2);
+                            visualization_msgs::Marker marker;
+                            marker.header.frame_id = "map";
+                            marker.header.stamp = ros::Time();
+                            marker.id = id++;
+                            marker.type = visualization_msgs::Marker::SPHERE;
+                            marker.action = 0;
+                            marker.pose.position.x = current_pose_.position.x - alter_dmin * cos(newGap.getAngle() + yaw);
+                            marker.pose.position.y = current_pose_.position.y - alter_dmin * sin(newGap.getAngle() + yaw);
+                            marker.pose.position.z = 0.5;
+                            marker.pose.orientation.x = 0.0;
+                            marker.pose.orientation.y = 0.0;
+                            marker.pose.orientation.z = 0.0;
+                            marker.pose.orientation.w = 1.0;
+                            marker.lifetime = ros::Duration(0.2);
+                            marker.scale.x = 0.5;
+                            marker.scale.y = 0.5;
+                            marker.scale.z = 0.5;
+                            marker.color.a = 1.0; // Don't forget to set the alpha!
+                            marker.color.r = 1.0;
+                            marker.color.g = fmin(1, value / 2000);
+                            marker.color.b = 0.0;
+                            gap_selection.markers.push_back(marker);
+                            ROS_INFO_STREAM(gap_selection.markers.size());
+                        }
                     }
+                    // alter_min =
                     start_nan_idx = -1;
                     size = 0;
                     prev = false;
@@ -221,14 +268,18 @@ namespace fgm_plugin
                 } else {
                     l_dist = stored_scan_msgs.ranges[it];
                     dmin = fmin(dmin, l_dist);
+                    alter_dmin = l_dist;
                 }
             }
             // Populate obstacle heredmin
         }
 
+        gap_target.publish(gap_selection);
+        ROS_INFO_STREAM("---------------------");
+
         // Account for error
         if (prev) {
-            Gap placeHolder(start_nan_idx, 512 - start_index - 1, size, l_dist, 0, goal_angle, score);        
+            Gap placeHolder(start_nan_idx, 512 - start_index - 1, size, l_dist, 0, goal_angle, score, 0);        
             pq.push(placeHolder);
         }
 
@@ -265,6 +316,23 @@ namespace fgm_plugin
             // POTENTIAL HAZARD
         }
 
+
+        // {
+        //     // Transform
+        //     bool tf_ok = true;
+        //     tf::StampedTransform transform;
+        //     try {
+        //         tf::TransformListener listener;
+        //         listener.lookupTransform("map", "base_link", ros::Time(0), transform);
+        //     } catch (tf::TransformException ex) {
+        //         tf_ok = false;
+        //     }
+
+        //     if (tf_ok) {
+        //         // ROS_INFO_STREAM(transform);
+        //     }
+        // }
+
         // Questionable usefulness 
         {
             std::ostringstream ss;
@@ -273,6 +341,38 @@ namespace fgm_plugin
             angle_data.data = ss.str();
             info_pub.publish(angle_data);
         }
+
+        // {
+        //     visualization_msgs::Marker marker;
+        //     marker.header.frame_id = "map";
+        //     marker.header.stamp = ros::Time();
+        //     marker.id = 0;
+        //     marker.type = visualization_msgs::Marker::SPHERE;
+        //     marker.action = 0;
+        //     marker.pose.position.x = current_pose_.position.x - alter_min * cos(gap_angle + yaw);
+        //     marker.pose.position.y = current_pose_.position.y - alter_min * sin(gap_angle + yaw);
+        //     marker.pose.position.z = 0.5;
+        //     geometry_msgs::Point tp;
+        //     tp.x = 5 - alter_min * cos(gap_angle + yaw);
+        //     tp.y = 5 - alter_min * sin(gap_angle + yaw);
+        //     tp.z = 0;
+        //     // navfn.computePotential(tp);
+        //     ROS_INFO_STREAM(navfn.getPointPotential(tp));
+        //     marker.pose.orientation.x = 0.0;
+        //     marker.pose.orientation.y = 0.0;
+        //     marker.pose.orientation.z = 0.0;
+        //     marker.pose.orientation.w = 1.0;
+        //     marker.lifetime = ros::Duration(0.2);
+        //     marker.scale.x = 0.5;
+        //     marker.scale.y = 0.5;
+        //     marker.scale.z = 0.5;
+        //     // marker.lifetime = ros::Duration(0.2);
+        //     marker.color.a = 1.0; // Don't forget to set the alpha!
+        //     marker.color.r = 1.0;
+        //     marker.color.g = 0.0;
+        //     marker.color.b = 0.0;
+        //     gap_target.publish(marker);
+        // }
 
         heading = (alpha / dmin * gap_angle + goal_angle)/(alpha / dmin + 1);
         ROS_DEBUG("Dmin= %f", dmin);

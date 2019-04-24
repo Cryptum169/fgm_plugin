@@ -18,10 +18,11 @@ class Gap
     float gap_angle;
     bool score;
     float _robot_ori;
+    double _map_score;
 
   public:
     Gap();
-    Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal, bool score);
+    Gap(int _start, int _end, int _size, float l_dist, float r_dist, float goal, bool score, double map_score);
 
     void setGoalAngle(float _goal_angle);
 
@@ -36,6 +37,8 @@ class Gap
 
     void recordOdom(float robot_orientation);
     float getOdom();
+
+    void setScore(double);
 };
 #else
 #endif
