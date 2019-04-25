@@ -11,13 +11,14 @@
 #include <fgm_plugin/gap.h>
 #include <fgm_plugin/fgm_planner.h>
 #include <fgm_plugin/gap_comparator.h>
+#include <turtlebot_trajectory_generator/near_identity.h>
 
 #ifndef PI
 #define PI 3.1415926
 #endif
 
 PLUGINLIB_EXPORT_CLASS(fgm_plugin::FGMPlanner, nav_core::BaseLocalPlanner)
-
+typedef std::vector< double > ni_state;
 namespace fgm_plugin
 {
     FGMPlanner::FGMPlanner() {
@@ -47,10 +48,6 @@ namespace fgm_plugin
         // Robot Pose message
         sharedPtr_pose = msg;
     }
-
-    // void FGMPlanner::globalcmapCallback(boost::shared_ptr< const> msg) {
-    //     global_cmap_flag = true;
-    // }
 
     void FGMPlanner::reconfigureCb(fgm_plugin::FGMConfig& config, uint32_t level) {
         // Reconfigure Parameter
@@ -226,10 +223,6 @@ namespace fgm_plugin
 
 
                         {
-                            // tp_2.x = 5 - alter_min * cos(newGap.getAngle() + yaw);
-                            // tp_2.y = 5 - alter_min * sin(newGap.getAngle() + yaw);
-                            // tp_2.z = 0;
-                            // double value = navfn.getPointPotential(tp_2);
                             visualization_msgs::Marker marker;
                             marker.header.frame_id = "map";
                             marker.header.stamp = ros::Time();
@@ -316,23 +309,6 @@ namespace fgm_plugin
             // POTENTIAL HAZARD
         }
 
-
-        // {
-        //     // Transform
-        //     bool tf_ok = true;
-        //     tf::StampedTransform transform;
-        //     try {
-        //         tf::TransformListener listener;
-        //         listener.lookupTransform("map", "base_link", ros::Time(0), transform);
-        //     } catch (tf::TransformException ex) {
-        //         tf_ok = false;
-        //     }
-
-        //     if (tf_ok) {
-        //         // ROS_INFO_STREAM(transform);
-        //     }
-        // }
-
         // Questionable usefulness 
         {
             std::ostringstream ss;
@@ -342,37 +318,30 @@ namespace fgm_plugin
             info_pub.publish(angle_data);
         }
 
-        // {
-        //     visualization_msgs::Marker marker;
-        //     marker.header.frame_id = "map";
-        //     marker.header.stamp = ros::Time();
-        //     marker.id = 0;
-        //     marker.type = visualization_msgs::Marker::SPHERE;
-        //     marker.action = 0;
-        //     marker.pose.position.x = current_pose_.position.x - alter_min * cos(gap_angle + yaw);
-        //     marker.pose.position.y = current_pose_.position.y - alter_min * sin(gap_angle + yaw);
-        //     marker.pose.position.z = 0.5;
-        //     geometry_msgs::Point tp;
-        //     tp.x = 5 - alter_min * cos(gap_angle + yaw);
-        //     tp.y = 5 - alter_min * sin(gap_angle + yaw);
-        //     tp.z = 0;
-        //     // navfn.computePotential(tp);
-        //     ROS_INFO_STREAM(navfn.getPointPotential(tp));
-        //     marker.pose.orientation.x = 0.0;
-        //     marker.pose.orientation.y = 0.0;
-        //     marker.pose.orientation.z = 0.0;
-        //     marker.pose.orientation.w = 1.0;
-        //     marker.lifetime = ros::Duration(0.2);
-        //     marker.scale.x = 0.5;
-        //     marker.scale.y = 0.5;
-        //     marker.scale.z = 0.5;
-        //     // marker.lifetime = ros::Duration(0.2);
-        //     marker.color.a = 1.0; // Don't forget to set the alpha!
-        //     marker.color.r = 1.0;
-        //     marker.color.g = 0.0;
-        //     marker.color.b = 0.0;
-        //     gap_target.publish(marker);
-        // }
+        {
+            // Near Identity
+            near_identity ni(1,2,1,.01);
+            ni_state x0(8), dx(8);
+            x0[0] = current_pose_.position.x; //x0
+            x0[1] = current_pose_.position.y; //y0
+            x0[2] = yaw; //theta0
+            x0[3] = 0.0; //v0
+            x0[4] = 0.0; //w0
+            x0[5] = 0.5; //lambda0
+            x0[6] =  - dmin * cos(gap_angle + yaw); //xd0
+            x0[7] =  - dmin * sin(gap_angle + yaw); //yd0
+
+            dx[0] = 0.0; //x0
+            dx[1] = 0.0; //y0
+            dx[2] = 0.0; //theta0
+            dx[3] = 0.0; //v0
+            dx[4] = 0.0; //w0
+            dx[5] = 0.5; //lambda0
+            dx[6] = 0.0; //xd0
+            dx[7] = 0.0; //yd0
+            ni(x0, dx);
+            ROS_INFO("%d, %d",dx[3], dx[4]);
+        }
 
         heading = (alpha / dmin * gap_angle + goal_angle)/(alpha / dmin + 1);
         ROS_DEBUG("Dmin= %f", dmin);
