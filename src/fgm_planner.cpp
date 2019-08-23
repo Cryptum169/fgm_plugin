@@ -18,7 +18,7 @@
 #endif
 
 PLUGINLIB_EXPORT_CLASS(fgm_plugin::FGMPlanner, nav_core::BaseLocalPlanner)
-typedef std::vector< double > ni_state;
+// typedef std::vector< double > ni_state;
 namespace fgm_plugin
 {
     FGMPlanner::FGMPlanner() {
@@ -318,30 +318,30 @@ namespace fgm_plugin
             info_pub.publish(angle_data);
         }
 
-        {
-            // Near Identity
-            near_identity ni(1,2,1,.01);
-            ni_state x0(8), dx(8);
-            x0[0] = current_pose_.position.x; //x0
-            x0[1] = current_pose_.position.y; //y0
-            x0[2] = yaw; //theta0
-            x0[3] = 0.0; //v0
-            x0[4] = 0.0; //w0
-            x0[5] = 0.5; //lambda0
-            x0[6] =  - dmin * cos(gap_angle + yaw); //xd0
-            x0[7] =  - dmin * sin(gap_angle + yaw); //yd0
+        // {
+        //     // Near Identity
+        //     near_identity ni(1,2,1,.01);
+        //     ni_state x0(8), dx(8);
+        //     x0[0] = current_pose_.position.x; //x0
+        //     x0[1] = current_pose_.position.y; //y0
+        //     x0[2] = yaw; //theta0
+        //     x0[3] = 0.0; //v0
+        //     x0[4] = 0.0; //w0
+        //     x0[5] = 0.5; //lambda0
+        //     x0[6] =  - dmin * cos(gap_angle + yaw); //xd0
+        //     x0[7] =  - dmin * sin(gap_angle + yaw); //yd0
 
-            dx[0] = 0.0; //x0
-            dx[1] = 0.0; //y0
-            dx[2] = 0.0; //theta0
-            dx[3] = 0.0; //v0
-            dx[4] = 0.0; //w0
-            dx[5] = 0.5; //lambda0
-            dx[6] = 0.0; //xd0
-            dx[7] = 0.0; //yd0
-            ni(x0, dx);
-            ROS_INFO("%d, %d",dx[3], dx[4]);
-        }
+        //     dx[0] = 0.0; //x0
+        //     dx[1] = 0.0; //y0
+        //     dx[2] = 0.0; //theta0
+        //     dx[3] = 0.0; //v0
+        //     dx[4] = 0.0; //w0
+        //     dx[5] = 0.5; //lambda0
+        //     dx[6] = 0.0; //xd0
+        //     dx[7] = 0.0; //yd0
+        //     ni(x0, dx);
+        //     ROS_INFO("%d, %d",dx[3], dx[4]);
+        // }
 
         heading = (alpha / dmin * gap_angle + goal_angle)/(alpha / dmin + 1);
         ROS_DEBUG("Dmin= %f", dmin);
